@@ -1,0 +1,89 @@
+<!--
+  Parchment reader shown beside a held journal page (src/game/systems/reader-system.ts).
+  Display only: pointer events are off so it never interferes with grabbing.
+  Natural size 60 x ~70 units; the system scales it to ~0.3 m wide.
+  Classes are prefixed "pg-" (UIKit classes share one global stylesheet).
+-->
+<style>
+  .pg-root {
+    display: flex;
+    flex-direction: column;
+    width: 60;
+    padding-top: 4.2;
+    padding-bottom: 4.4;
+    padding-left: 4.8;
+    padding-right: 4.8;
+    font-family: merriweather;
+    font-weight: 500;
+    font-size: 2.5;
+    line-height: 1.6;
+    color: #33291c;
+    background-color: #eadcbc;
+    border-color: #b8955e;
+    border-width: 0.4;
+    border-radius: 1.2;
+    pointer-events: none;
+  }
+  .pg-eyebrow {
+    font-family: inter;
+    font-size: 1.9;
+    font-weight: 700;
+    color: #8a6a3e;
+  }
+  .pg-title {
+    font-family: crimson-text;
+    font-size: 4.6;
+    font-weight: 700;
+    line-height: 1.12;
+    color: #2a2116;
+    margin-top: 1.6;
+  }
+  .pg-author {
+    font-family: crimson-text;
+    font-size: 2.9;
+    font-weight: 600;
+    color: #7a5f3a;
+    margin-top: 0.8;
+  }
+  .pg-rule {
+    width: 100%;
+    height: 0.25;
+    background-color: #c7ab7a;
+    margin-top: 2.4;
+    margin-bottom: 2.4;
+  }
+  .pg-body {
+    font-size: 2.5;
+    line-height: 1.6;
+    color: #33291c;
+  }
+  .pg-teach {
+    display: flex;
+    flex-direction: column;
+    margin-top: 3;
+    padding-top: 1.8;
+    padding-bottom: 2;
+    padding-left: 2.4;
+    padding-right: 2.4;
+    border-radius: 0.8;
+    background-color: #dcc79c;
+  }
+  .pg-teach-text {
+    font-family: inter;
+    font-size: 2.5;
+    font-weight: 700;
+    color: #3b2e1c;
+    margin-top: 0.5;
+  }
+</style>
+<div class="pg-root">
+  <span id="pg-num" class="pg-eyebrow">PAGE 1 OF 7</span>
+  <span id="pg-title" class="pg-title">If you are reading this, it's you.</span>
+  <span id="pg-author" class="pg-author">- You, before</span>
+  <div class="pg-rule"></div>
+  <span id="pg-body" class="pg-body">The Kindling takes memory the way it took the fire, so I wrote it down. The lighter is yours: the last flame that still answers. The axe and the bench are ours. Start with warmth. Light the fire, eat something hot, then make a torch: stick, cloth and resin, struck three times on the bench. Keep the fire fed. When night comes, you will understand why.</span>
+  <div id="pg-teach" class="pg-teach">
+    <span class="pg-eyebrow">BENCH RECIPE</span>
+    <span id="pg-teach-text" class="pg-teach-text">Torch: stick + cloth + resin</span>
+  </div>
+</div>

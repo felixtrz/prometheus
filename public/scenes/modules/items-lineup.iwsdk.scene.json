@@ -1,0 +1,571 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.DomeGradient": {
+      "sky": [
+        0.1,
+        0.36,
+        0.68,
+        1
+      ],
+      "equator": [
+        0.62,
+        0.8,
+        0.87,
+        1
+      ],
+      "ground": [
+        0.32,
+        0.38,
+        0.2,
+        1
+      ],
+      "intensity": 1
+    },
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [
+        0.53,
+        0.68,
+        0.81,
+        1
+      ],
+      "equator": [
+        0.72,
+        0.77,
+        0.65,
+        1
+      ],
+      "ground": [
+        0.28,
+        0.34,
+        0.17,
+        1
+      ],
+      "intensity": 0.8
+    }
+  },
+  "resources": {},
+  "authoring": {
+    "views": [
+      {
+        "id": "lineup",
+        "role": "hero",
+        "projection": "perspective",
+        "position": [
+          0,
+          2.25,
+          1.7
+        ],
+        "target": [
+          0,
+          1.05,
+          -0.6
+        ],
+        "fov": 58
+      },
+      {
+        "id": "closeup",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          0,
+          1.5,
+          0.85
+        ],
+        "target": [
+          0,
+          1.0,
+          -0.05
+        ],
+        "fov": 72
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "sun",
+      "content": {
+        "type": "group"
+      },
+      "transform": {
+        "position": [
+          -7,
+          22,
+          9
+        ],
+        "rotationDeg": [
+          -58,
+          -30,
+          0
+        ]
+      },
+      "components": {
+        "DirectionalLight": {
+          "color": [
+            1,
+            0.89,
+            0.72,
+            1
+          ],
+          "intensity": 1.7
+        }
+      }
+    },
+    {
+      "id": "ambient-fill",
+      "content": {
+        "type": "group"
+      },
+      "components": {
+        "HemisphereLight": {
+          "skyColor": [
+            0.69,
+            0.82,
+            1,
+            1
+          ],
+          "groundColor": [
+            0.33,
+            0.4,
+            0.18,
+            1
+          ],
+          "intensity": 0.3
+        }
+      }
+    },
+    {
+      "id": "row-small",
+      "name": "Row A: resources and food",
+      "content": {
+        "type": "group"
+      },
+      "children": [
+        {
+          "id": "a-page",
+          "name": "page",
+          "content": {
+            "type": "asset",
+            "asset": "page"
+          },
+          "transform": {
+            "position": [
+              -1.43,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-flint",
+          "name": "flint",
+          "content": {
+            "type": "asset",
+            "asset": "flint"
+          },
+          "transform": {
+            "position": [
+              -1.17,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-cord",
+          "name": "cord",
+          "content": {
+            "type": "asset",
+            "asset": "cord"
+          },
+          "transform": {
+            "position": [
+              -0.91,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-trigger",
+          "name": "trigger",
+          "content": {
+            "type": "asset",
+            "asset": "trigger"
+          },
+          "transform": {
+            "position": [
+              -0.65,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-spring",
+          "name": "spring",
+          "content": {
+            "type": "asset",
+            "asset": "spring"
+          },
+          "transform": {
+            "position": [
+              -0.39,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-berries",
+          "name": "berries",
+          "content": {
+            "type": "asset",
+            "asset": "berries"
+          },
+          "transform": {
+            "position": [
+              -0.13,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-herb",
+          "name": "herb",
+          "content": {
+            "type": "asset",
+            "asset": "herb"
+          },
+          "transform": {
+            "position": [
+              0.13,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-resin",
+          "name": "resin",
+          "content": {
+            "type": "asset",
+            "asset": "resin"
+          },
+          "transform": {
+            "position": [
+              0.39,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-meat",
+          "name": "meat",
+          "content": {
+            "type": "asset",
+            "asset": "meat"
+          },
+          "transform": {
+            "position": [
+              0.65,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-mushroom",
+          "name": "mushroom",
+          "content": {
+            "type": "asset",
+            "asset": "mushroom"
+          },
+          "transform": {
+            "position": [
+              0.91,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-lighter",
+          "name": "lighter",
+          "content": {
+            "type": "asset",
+            "asset": "lighter"
+          },
+          "transform": {
+            "position": [
+              1.17,
+              1.02,
+              0
+            ]
+          }
+        },
+        {
+          "id": "a-bolt",
+          "name": "bolt",
+          "content": {
+            "type": "asset",
+            "asset": "bolt"
+          },
+          "transform": {
+            "position": [
+              1.43,
+              1.02,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "row-tools",
+      "name": "Row B: tools and bulk",
+      "content": {
+        "type": "group"
+      },
+      "children": [
+        {
+          "id": "b-stick",
+          "name": "stick",
+          "content": {
+            "type": "asset",
+            "asset": "stick"
+          },
+          "transform": {
+            "position": [
+              -1.75,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-log",
+          "name": "log",
+          "content": {
+            "type": "asset",
+            "asset": "log"
+          },
+          "transform": {
+            "position": [
+              -1.4,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-plank",
+          "name": "plank",
+          "content": {
+            "type": "asset",
+            "asset": "plank"
+          },
+          "transform": {
+            "position": [
+              -1.05,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-cloth",
+          "name": "cloth",
+          "content": {
+            "type": "asset",
+            "asset": "cloth"
+          },
+          "transform": {
+            "position": [
+              -0.7,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-stew-bowl",
+          "name": "stew-bowl",
+          "content": {
+            "type": "asset",
+            "asset": "stew-bowl"
+          },
+          "transform": {
+            "position": [
+              -0.35,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-spoon",
+          "name": "spoon",
+          "content": {
+            "type": "asset",
+            "asset": "spoon"
+          },
+          "transform": {
+            "position": [
+              0.0,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-hammer",
+          "name": "hammer",
+          "content": {
+            "type": "asset",
+            "asset": "hammer"
+          },
+          "transform": {
+            "position": [
+              0.35,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-axe",
+          "name": "axe",
+          "content": {
+            "type": "asset",
+            "asset": "axe"
+          },
+          "transform": {
+            "position": [
+              0.7,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-torch",
+          "name": "torch",
+          "content": {
+            "type": "asset",
+            "asset": "torch"
+          },
+          "transform": {
+            "position": [
+              1.05,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-bolt-bundle",
+          "name": "bolt-bundle",
+          "content": {
+            "type": "asset",
+            "asset": "bolt-bundle"
+          },
+          "transform": {
+            "position": [
+              1.4,
+              1.1,
+              -0.55
+            ]
+          }
+        },
+        {
+          "id": "b-pack-roll",
+          "name": "pack-roll",
+          "content": {
+            "type": "asset",
+            "asset": "pack-roll"
+          },
+          "transform": {
+            "position": [
+              1.75,
+              1.1,
+              -0.55
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "row-large",
+      "name": "Row C: weapons and sentry",
+      "content": {
+        "type": "group"
+      },
+      "children": [
+        {
+          "id": "c-spear",
+          "name": "spear",
+          "content": {
+            "type": "asset",
+            "asset": "spear"
+          },
+          "transform": {
+            "position": [
+              -1.55,
+              1.28,
+              -1.25
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              -90
+            ]
+          }
+        },
+        {
+          "id": "c-crossbow",
+          "name": "crossbow",
+          "content": {
+            "type": "asset",
+            "asset": "crossbow"
+          },
+          "transform": {
+            "position": [
+              0.1,
+              1.25,
+              -1.25
+            ],
+            "rotationDeg": [
+              0,
+              -35,
+              0
+            ]
+          }
+        },
+        {
+          "id": "c-sentry-kit",
+          "name": "sentry-kit",
+          "content": {
+            "type": "asset",
+            "asset": "sentry-kit"
+          },
+          "transform": {
+            "position": [
+              1.2,
+              1.12,
+              -1.25
+            ],
+            "rotationDeg": [
+              0,
+              -30,
+              0
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

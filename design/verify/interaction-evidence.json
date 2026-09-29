@@ -1,0 +1,194 @@
+{
+  "cooking": {
+    "before": {
+      "ingredients": 3,
+      "materials": 0,
+      "stir": 0.23165398836135864,
+      "strikes": 0,
+      "stewReady": false,
+      "stewEaten": false,
+      "torchCrafted": false,
+      "torchLit": false,
+      "hunger": 65,
+      "revision": 2
+    },
+    "stationary": {
+      "ingredients": 3,
+      "materials": 0,
+      "stir": 0.23165398836135864,
+      "strikes": 0,
+      "stewReady": false,
+      "stewEaten": false,
+      "torchCrafted": false,
+      "torchLit": false,
+      "hunger": 65,
+      "revision": 2
+    },
+    "cooked": {
+      "ingredients": 3,
+      "materials": 0,
+      "stir": 12.566370964050293,
+      "strikes": 0,
+      "stewReady": true,
+      "stewEaten": false,
+      "torchCrafted": false,
+      "torchLit": false,
+      "hunger": 65,
+      "revision": 3
+    }
+  },
+  "placement": {
+    "acceptedGrab": {
+      "entities": [],
+      "total": 0,
+      "limited": false,
+      "_tab": {
+        "id": "tab-mu4e10if-nnivb7",
+        "generation": 2
+      }
+    },
+    "bad": {
+      "entityIndex": 23,
+      "active": true,
+      "name": "Item Cloth",
+      "components": [
+        {
+          "componentId": "Transform",
+          "description": "Component for 3D transformation (position, rotation, scale)",
+          "values": {
+            "position": [
+              1.9600000381469727,
+              1.0199999809265137,
+              -0.9900000095367432
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "parent": {
+              "entityIndex": 11,
+              "name": "LevelRoot"
+            }
+          }
+        },
+        {
+          "componentId": "CampItem",
+          "values": {
+            "kind": "cloth",
+            "home": [
+              1.9600000381469727,
+              1.0199999809265137,
+              -0.9900000095367432
+            ],
+            "accepted": false
+          }
+        }
+      ],
+      "_tab": {
+        "id": "tab-mu4e10if-nnivb7",
+        "generation": 2
+      }
+    },
+    "state": {
+      "entityIndex": 14,
+      "active": true,
+      "name": "Campfire",
+      "components": [
+        {
+          "componentId": "CampState",
+          "values": {
+            "ingredients": 3,
+            "materials": 7,
+            "stir": 12.566370964050293,
+            "strikes": 0,
+            "stewReady": true,
+            "stewEaten": false,
+            "torchCrafted": false,
+            "torchLit": false,
+            "hunger": 65,
+            "revision": 6
+          }
+        }
+      ],
+      "_tab": {
+        "id": "tab-mu4e10if-nnivb7",
+        "generation": 2
+      }
+    }
+  },
+  "hammer": [
+    {
+      "ingredients": 3,
+      "materials": 7,
+      "stir": 12.566370964050293,
+      "strikes": 1,
+      "stewReady": true,
+      "stewEaten": false,
+      "torchCrafted": false,
+      "torchLit": false,
+      "hunger": 65,
+      "revision": 7
+    },
+    {
+      "stationary": {
+        "ingredients": 3,
+        "materials": 7,
+        "stir": 12.566370964050293,
+        "strikes": 1,
+        "stewReady": true,
+        "stewEaten": false,
+        "torchCrafted": false,
+        "torchLit": false,
+        "hunger": 65,
+        "revision": 7
+      }
+    },
+    {
+      "ingredients": 3,
+      "materials": 7,
+      "stir": 12.566370964050293,
+      "strikes": 2,
+      "stewReady": true,
+      "stewEaten": false,
+      "torchCrafted": false,
+      "torchLit": false,
+      "hunger": 65,
+      "revision": 8
+    },
+    {
+      "ingredients": 3,
+      "materials": 7,
+      "stir": 12.566370964050293,
+      "strikes": 3,
+      "stewReady": true,
+      "stewEaten": false,
+      "torchCrafted": true,
+      "torchLit": false,
+      "hunger": 65,
+      "revision": 10
+    }
+  ],
+  "ignition": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"entityIndex\": 14,\n  \"active\": true,\n  \"name\": \"Campfire\",\n  \"components\": [\n    {\n      \"componentId\": \"CampState\",\n      \"values\": {\n        \"ingredients\": 3,\n        \"materials\": 7,\n        \"stir\": 12.566370964050293,\n        \"strikes\": 3,\n        \"stewReady\": true,\n        \"stewEaten\": false,\n        \"torchCrafted\": true,\n        \"torchLit\": true,\n        \"hunger\": 65,\n        \"revision\": 11\n      }\n    }\n  ],\n  \"_tab\": {\n    \"id\": \"tab-mu4e10if-nnivb7\",\n    \"generation\": 2\n  }\n}"
+      }
+    ]
+  },
+  "eating": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"entityIndex\": 14,\n  \"active\": true,\n  \"name\": \"Campfire\",\n  \"components\": [\n    {\n      \"componentId\": \"CampState\",\n      \"values\": {\n        \"ingredients\": 3,\n        \"materials\": 7,\n        \"stir\": 12.566370964050293,\n        \"strikes\": 3,\n        \"stewReady\": true,\n        \"stewEaten\": true,\n        \"torchCrafted\": true,\n        \"torchLit\": true,\n        \"hunger\": 100,\n        \"revision\": 12\n      }\n    }\n  ],\n  \"_tab\": {\n    \"id\": \"tab-mu4e10if-nnivb7\",\n    \"generation\": 2\n  }\n}"
+      }
+    ]
+  }
+}

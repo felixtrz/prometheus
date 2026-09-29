@@ -1,0 +1,73 @@
+<!--
+  The shade's words: a subtitle for bus 'guide' lines (Prometheus' shade speaking).
+  One instance, code-spawned by src/game/systems/toast-system.ts below the toast
+  stack and never shared with ordinary toasts. Display only: pointer events off.
+  Ember/gold serif with a flame glyph on an 80% opaque panel, upright (no shear: a
+  sheared box read as a rolled one), placed 1.3 m out along the view and turned to
+  face the eye; the 3.3-unit text is about 1 degree tall. "sb-hint" is the line's
+  subtitle-only control hint (never spoken), shown on its own line in a plain face,
+  or hidden.
+  Natural size 64 x ~10 units (cm). Classes are prefixed "sb-".
+-->
+<style>
+  .sb-root {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 64;
+    gap: 2.2;
+    padding-top: 1.9;
+    padding-bottom: 2.1;
+    padding-left: 2.6;
+    padding-right: 3.4;
+    font-family: crimson-text;
+    font-weight: 700;
+    font-size: 3.3;
+    line-height: 1.3;
+    color: #f2c27a;
+    background-color: #1a120ccc;
+    border-color: #8a5a2c;
+    border-width: 0.25;
+    border-radius: 1.6;
+    pointer-events: none;
+  }
+  .sb-glyph {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 5.4;
+    height: 5.4;
+    border-radius: 2.7;
+    background-color: #33200f;
+  }
+  .sb-flame {
+    width: 3.4;
+    height: 3.4;
+    color: #ff9a45;
+  }
+  .sb-lines {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    gap: 0.9;
+  }
+  .sb-text {
+    color: #f2c27a;
+  }
+  .sb-hint {
+    font-family: inter;
+    font-weight: 500;
+    font-size: 2.4;
+    line-height: 1.3;
+    color: #cdb89a;
+  }
+</style>
+<div id="sb-root" class="sb-root">
+  <div class="sb-glyph"><Flame class="sb-flame"></Flame></div>
+  <div class="sb-lines">
+    <span id="sb-text" class="sb-text">Wake, keeper. Your fire is cold. Close your hand on the lighter in your pack, there on the table.</span>
+    <span id="sb-hint" class="sb-hint">Squeeze the grip button to hold.</span>
+  </div>
+</div>

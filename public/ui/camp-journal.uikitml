@@ -1,0 +1,529 @@
+<!--
+  Prometheus field journal (world-space panel at camp, scene node "camp-journal").
+  Bound by src/game/systems/journal-system.ts. Every class is prefixed "jr-" because
+  UIKit class names share one global stylesheet across all .uikitml files.
+  Bundled MSDF fonts only (offline): their atlases are ASCII + Latin-1, so runtime
+  text is sanitised to plain punctuation and symbols come from Lucide icons.
+  Natural size: 150 x ~100 cm (UIKit units are centimetres).
+  The COMFORT card's chips write src/game/settings.ts (tap to toggle); after the ending the
+  end card shows the journey's stats and the New journey prompt.
+-->
+<style>
+  .jr-root {
+    display: flex;
+    flex-direction: column;
+    width: 150;
+    padding-top: 5;
+    padding-bottom: 5;
+    padding-left: 5.5;
+    padding-right: 5.5;
+    font-family: inter;
+    font-weight: 500;
+    font-size: 2.5;
+    line-height: 1.4;
+    color: #ede9da;
+    background-color: #192520;
+    border-color: #75634a;
+    border-width: 0.25;
+    border-radius: 2.2;
+  }
+  .jr-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .jr-hgroup {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.6;
+  }
+  .jr-stack {
+    display: flex;
+    flex-direction: column;
+  }
+  .jr-stack-end {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .jr-eyebrow {
+    color: #cba875;
+    font-size: 2.1;
+    font-weight: 700;
+  }
+  .jr-brand {
+    font-family: crimson-text;
+    font-size: 6.6;
+    font-weight: 700;
+    line-height: 1.05;
+    color: #ede9da;
+  }
+  .jr-day {
+    font-size: 3.8;
+    font-weight: 700;
+    color: #ede9da;
+  }
+  .jr-clock {
+    font-size: 2.5;
+    color: #a5b2a5;
+  }
+  .jr-sky {
+    width: 5.4;
+    height: 5.4;
+    color: #d4b180;
+  }
+  .jr-rule {
+    width: 100%;
+    height: 0.2;
+    background-color: #3a4a40;
+    margin-top: 3;
+    margin-bottom: 3.5;
+  }
+  .jr-cols {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 3.5;
+    width: 100%;
+  }
+  .jr-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2.8;
+    width: 46;
+  }
+  .jr-col-narrow {
+    width: 39;
+  }
+  .jr-col-wide {
+    width: 47;
+  }
+  .jr-card {
+    display: flex;
+    flex-direction: column;
+    background-color: #25352d;
+    border-radius: 1.2;
+    padding-top: 3;
+    padding-bottom: 3.2;
+    padding-left: 3.4;
+    padding-right: 3.4;
+  }
+  .jr-focus {
+    border-color: #d4b180;
+    border-width: 0.25;
+    background-color: #2b3c32;
+  }
+  .jr-obj-title {
+    font-family: crimson-text;
+    font-size: 4.8;
+    font-weight: 700;
+    line-height: 1.12;
+    margin-top: 1.4;
+  }
+  .jr-obj-hint {
+    font-size: 2.7;
+    color: #d3dacd;
+    line-height: 1.5;
+    margin-top: 1.4;
+  }
+  .jr-tonight-row {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.2;
+    margin-top: 1.8;
+    padding-top: 1.4;
+    padding-bottom: 1.4;
+    padding-left: 1.6;
+    padding-right: 1.6;
+    border-radius: 0.8;
+    background-color: #1e2b24;
+  }
+  .jr-tonight-icon {
+    flex-shrink: 0;
+    width: 2.8;
+    height: 2.8;
+    color: #d4b180;
+  }
+  .jr-tonight {
+    font-size: 2.45;
+    font-weight: 700;
+    color: #d4b180;
+  }
+  .jr-end-body {
+    font-size: 2.7;
+    color: #ede9da;
+    line-height: 1.55;
+    margin-top: 1.6;
+  }
+  .jr-num {
+    flex-shrink: 0;
+    color: #cba875;
+    font-size: 2.3;
+    font-weight: 700;
+  }
+  .jr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25;
+    margin-top: 2.2;
+  }
+  .jr-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.8;
+  }
+  .jr-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3;
+    height: 3;
+    border-radius: 0.6;
+    border-width: 0.25;
+    border-color: #5d6d60;
+  }
+  .jr-tick {
+    display: none;
+    width: 2.4;
+    height: 2.4;
+    color: #192520;
+  }
+  .jr-item-text {
+    font-size: 2.5;
+    color: #a9b8a8;
+  }
+  .jr-vital {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9;
+  }
+  .jr-label {
+    font-size: 2.1;
+    font-weight: 700;
+    color: #a5b2a5;
+  }
+  .jr-value {
+    font-size: 2.5;
+    font-weight: 700;
+    color: #d4b180;
+  }
+  .jr-track {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 1.6;
+    border-radius: 0.8;
+    background-color: #141e19;
+  }
+  .jr-fill-hunger {
+    height: 100%;
+    width: 70%;
+    border-radius: 0.8;
+    background-color: #86b36a;
+  }
+  .jr-fill-health {
+    height: 100%;
+    width: 100%;
+    border-radius: 0.8;
+    background-color: #86b36a;
+  }
+  .jr-recipe {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1;
+  }
+  .jr-recipe-name {
+    width: 14;
+    font-size: 2.4;
+    font-weight: 700;
+    color: #909f92;
+    flex-shrink: 0;
+  }
+  .jr-recipe-inputs {
+    font-size: 2.15;
+    color: #909f92;
+    flex-grow: 1;
+  }
+  .jr-page {
+    font-size: 2.3;
+    line-height: 1.3;
+    color: #909f92;
+    padding-top: 0.25;
+    padding-bottom: 0.25;
+    padding-left: 0.8;
+    padding-right: 0.8;
+    margin-left: -0.8;
+    margin-right: -0.8;
+    border-radius: 0.6;
+  }
+  .jr-caption {
+    margin-top: 1.8;
+    font-size: 2.1;
+    color: #a5b2a5;
+  }
+  .jr-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 2.2;
+  }
+  .jr-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 8.5;
+    flex-grow: 1;
+    border-radius: 1.1;
+    border-width: 0.25;
+    border-color: #b78d59;
+    background-color: #d9ae70;
+    color: #17231e;
+    font-size: 2.8;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .jr-btn:hover { background-color: #e6c089; }
+  .jr-btn-quiet {
+    background-color: #192520;
+    border-color: #667567;
+    color: #d5dece;
+  }
+  .jr-btn-quiet:hover { background-color: #25352d; }
+  .jr-set-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2;
+    margin-top: 2;
+  }
+  .jr-set-row {
+    display: flex;
+    flex-direction: row;
+    gap: 1.2;
+  }
+  .jr-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 50%;
+    flex-grow: 1;
+    padding-top: 1;
+    padding-bottom: 1.1;
+    padding-left: 1.3;
+    padding-right: 0.8;
+    border-radius: 1;
+    border-width: 0.25;
+    border-color: #667567;
+    background-color: #192520;
+    cursor: pointer;
+  }
+  .jr-chip:hover { background-color: #33473c; }
+  .jr-chip-label {
+    font-size: 1.62;
+    font-weight: 700;
+    color: #a5b2a5;
+  }
+  .jr-chip-val {
+    font-size: 2.6;
+    font-weight: 700;
+    color: #d5dece;
+  }
+  .jr-stats {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 1.2;
+    margin-top: 2;
+  }
+  .jr-stat {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 14.6;
+    padding-top: 0.7;
+    padding-bottom: 0.8;
+    padding-left: 1.3;
+    padding-right: 1.3;
+    border-radius: 0.8;
+    background-color: #1e2b24;
+  }
+  .jr-stat-label {
+    font-size: 1.6;
+    font-weight: 700;
+    color: #a5b2a5;
+  }
+  .jr-stat-val {
+    font-size: 2.7;
+    font-weight: 700;
+    color: #d4b180;
+  }
+  .jr-end-prompt {
+    margin-top: 2;
+    font-size: 2.5;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #d4b180;
+  }
+  .jr-help {
+    display: flex;
+    flex-direction: column;
+    padding-left: 0.4;
+    font-size: 2.2;
+    line-height: 1.5;
+    color: #a5b2a5;
+  }
+</style>
+<div class="jr-root">
+  <div class="jr-row">
+    <div class="jr-stack">
+      <span class="jr-eyebrow">EXPEDITION KEEPER'S JOURNAL</span>
+      <span class="jr-brand">Prometheus</span>
+    </div>
+    <div class="jr-hgroup">
+      <Sun id="jr-ic-day" class="jr-sky"></Sun>
+      <Sunset id="jr-ic-dusk" class="jr-sky" style="display: none"></Sunset>
+      <Moon id="jr-ic-night" class="jr-sky" style="display: none"></Moon>
+      <Sunrise id="jr-ic-dawn" class="jr-sky" style="display: none"></Sunrise>
+      <div class="jr-stack-end">
+        <span id="jr-day" class="jr-day">Day 1 - Morning</span>
+        <span id="jr-clock" class="jr-clock">Dusk in 5 min</span>
+      </div>
+    </div>
+  </div>
+  <div class="jr-rule"></div>
+
+  <div class="jr-cols">
+    <div class="jr-col jr-col-narrow">
+      <div id="jr-obj-card" class="jr-card jr-focus">
+        <div class="jr-row">
+          <span class="jr-eyebrow">NOW</span>
+          <span id="jr-obj-num" class="jr-num">1 OF 10</span>
+        </div>
+        <div id="jr-obj-title" class="jr-obj-title">Light the campfire</div>
+        <div id="jr-obj-hint" class="jr-obj-hint">Read the note in your pack, then take the lighter. Pull the trigger and hold the flame to the fire.</div>
+        <div id="jr-tonight-row" class="jr-tonight-row">
+          <Moon class="jr-tonight-icon"></Moon>
+          <span class="jr-tonight">Tonight: Survive the night, then sleep</span>
+        </div>
+      </div>
+      <div id="jr-end-card" class="jr-card jr-focus" style="display: none">
+        <span class="jr-eyebrow">YOUR JOURNEY</span>
+        <div id="jr-end-title" class="jr-obj-title">A flame carried.</div>
+        <div id="jr-end-body" class="jr-end-body">The valley remembers. So do you.</div>
+        <div class="jr-stats">
+          <div class="jr-stat"><span class="jr-stat-label">DAYS</span><span id="jr-st-days" class="jr-stat-val">1</span></div>
+          <div class="jr-stat"><span class="jr-stat-label">FALLS</span><span id="jr-st-falls" class="jr-stat-val">0</span></div>
+          <div class="jr-stat"><span class="jr-stat-label">PAGES</span><span id="jr-st-pages" class="jr-stat-val">0/7</span></div>
+          <div class="jr-stat"><span class="jr-stat-label">RECIPES</span><span id="jr-st-recipes" class="jr-stat-val">0/5</span></div>
+          <div class="jr-stat"><span class="jr-stat-label">MADE</span><span id="jr-st-made" class="jr-stat-val">0</span></div>
+          <div class="jr-stat"><span class="jr-stat-label">SLAIN</span><span id="jr-st-slain" class="jr-stat-val">0</span></div>
+        </div>
+        <span class="jr-end-prompt">Wake again? Tap New journey below.</span>
+      </div>
+
+      <div class="jr-card" style="gap: 2.4">
+        <div class="jr-vital">
+          <div class="jr-row">
+            <span class="jr-label">NOURISHMENT</span>
+            <span id="jr-hunger-val" class="jr-value">70</span>
+          </div>
+          <div class="jr-track"><div id="jr-hunger-fill" class="jr-fill-hunger"></div></div>
+        </div>
+        <div class="jr-vital">
+          <div class="jr-row">
+            <span class="jr-label">HEALTH</span>
+            <span id="jr-health-val" class="jr-value">100</span>
+          </div>
+          <div class="jr-track"><div id="jr-health-fill" class="jr-fill-health"></div></div>
+        </div>
+      </div>
+
+      <div class="jr-actions">
+        <button id="enter-xr" class="jr-btn">Enter VR</button>
+        <button id="exit-xr" class="jr-btn" style="display: none">Leave VR</button>
+        <button id="jr-new" class="jr-btn jr-btn-quiet"><span id="jr-new-label">New journey</span></button>
+      </div>
+      <div class="jr-help">
+        <span>Squeeze: grab. Trigger: use a tool.</span>
+        <span>Point + trigger: the bedroll.</span>
+        <span>Left stick: move. Right stick: turn.</span>
+      </div>
+    </div>
+
+    <div class="jr-col">
+      <div class="jr-card">
+        <div class="jr-row">
+          <span class="jr-eyebrow">OBJECTIVES</span>
+          <span id="jr-obj-count" class="jr-num">0 / 10</span>
+        </div>
+        <div class="jr-list">
+          <div class="jr-item"><div id="jr-o0-box" class="jr-box"><Check id="jr-o0-tick" class="jr-tick"></Check></div><span id="jr-o0-text" class="jr-item-text">Light the campfire</span></div>
+          <div class="jr-item"><div id="jr-o1-box" class="jr-box"><Check id="jr-o1-tick" class="jr-tick"></Check></div><span id="jr-o1-text" class="jr-item-text">Cook a meal and eat it</span></div>
+          <div class="jr-item"><div id="jr-o2-box" class="jr-box"><Check id="jr-o2-tick" class="jr-tick"></Check></div><span id="jr-o2-text" class="jr-item-text">Craft a torch and light it</span></div>
+          <div class="jr-item"><div id="jr-o3-box" class="jr-box"><Check id="jr-o3-tick" class="jr-tick"></Check></div><span id="jr-o3-text" class="jr-item-text">Sleep at the bedroll</span></div>
+          <div class="jr-item"><div id="jr-o4-box" class="jr-box"><Check id="jr-o4-tick" class="jr-tick"></Check></div><span id="jr-o4-text" class="jr-item-text">Craft a spear</span></div>
+          <div class="jr-item"><div id="jr-o5-box" class="jr-box"><Check id="jr-o5-tick" class="jr-tick"></Check></div><span id="jr-o5-text" class="jr-item-text">Hunt for meat</span></div>
+          <div class="jr-item"><div id="jr-o6-box" class="jr-box"><Check id="jr-o6-tick" class="jr-tick"></Check></div><span id="jr-o6-text" class="jr-item-text">Find the expedition outpost</span></div>
+          <div class="jr-item"><div id="jr-o7-box" class="jr-box"><Check id="jr-o7-tick" class="jr-tick"></Check></div><span id="jr-o7-text" class="jr-item-text">Craft the crossbow</span></div>
+          <div class="jr-item"><div id="jr-o8-box" class="jr-box"><Check id="jr-o8-tick" class="jr-tick"></Check></div><span id="jr-o8-text" class="jr-item-text">Build a sentry for camp</span></div>
+          <div class="jr-item"><div id="jr-o9-box" class="jr-box"><Check id="jr-o9-tick" class="jr-tick"></Check></div><span id="jr-o9-text" class="jr-item-text">Carry fire to the Spire</span></div>
+        </div>
+      </div>
+
+      <div class="jr-card">
+        <div class="jr-row">
+          <span class="jr-eyebrow">COMFORT</span>
+          <span class="jr-num">TAP TO CHANGE</span>
+        </div>
+        <div class="jr-set-grid">
+          <div class="jr-set-row">
+            <button id="jr-set-speed" class="jr-chip"><span class="jr-chip-label">WALKING SPEED</span><span id="jr-set-speed-val" class="jr-chip-val">Normal</span></button>
+            <button id="jr-set-tunnel" class="jr-chip"><span class="jr-chip-label">COMFORT TUNNEL</span><span id="jr-set-tunnel-val" class="jr-chip-val">On</span></button>
+          </div>
+          <div class="jr-set-row">
+            <button id="jr-set-flashes" class="jr-chip"><span class="jr-chip-label">REDUCE FLASHES</span><span id="jr-set-flashes-val" class="jr-chip-val">Off</span></button>
+            <button id="jr-set-subs" class="jr-chip"><span class="jr-chip-label">SUBTITLES</span><span id="jr-set-subs-val" class="jr-chip-val">On</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="jr-col jr-col-wide">
+      <div class="jr-card" style="padding-left: 3; padding-right: 3">
+        <div class="jr-row">
+          <span class="jr-eyebrow">BENCH RECIPES</span>
+          <span id="jr-rec-count" class="jr-num">0 / 5</span>
+        </div>
+        <div class="jr-list" style="gap: 1.2">
+          <div class="jr-recipe"><span id="jr-r0-name" class="jr-recipe-name">Torch</span><span id="jr-r0-inputs" class="jr-recipe-inputs">Page 1, in your pack</span></div>
+          <div class="jr-recipe"><span id="jr-r1-name" class="jr-recipe-name">Spear</span><span id="jr-r1-inputs" class="jr-recipe-inputs">Page 2, at the camp bench</span></div>
+          <div class="jr-recipe"><span id="jr-r2-name" class="jr-recipe-name">Bolt bundle</span><span id="jr-r2-inputs" class="jr-recipe-inputs">Page 4, on a rock by the brook</span></div>
+          <div class="jr-recipe"><span id="jr-r3-name" class="jr-recipe-name">Crossbow</span><span id="jr-r3-inputs" class="jr-recipe-inputs">Page 5, on the outpost table</span></div>
+          <div class="jr-recipe"><span id="jr-r4-name" class="jr-recipe-name">Sentry kit</span><span id="jr-r4-inputs" class="jr-recipe-inputs">Page 6, below the lookout</span></div>
+        </div>
+      </div>
+
+      <div class="jr-card">
+        <div class="jr-row">
+          <span class="jr-eyebrow">PAGES FOUND</span>
+          <span id="jr-pages-count" class="jr-num">0 / 7</span>
+        </div>
+        <div class="jr-list" style="gap: 1">
+          <span id="jr-p0" class="jr-page">1.  ...</span>
+          <span id="jr-p1" class="jr-page">2.  ...</span>
+          <span id="jr-p2" class="jr-page">3.  ...</span>
+          <span id="jr-p3" class="jr-page">4.  ...</span>
+          <span id="jr-p4" class="jr-page">5.  ...</span>
+          <span id="jr-p5" class="jr-page">6.  ...</span>
+          <span id="jr-p6" class="jr-page">7.  ...</span>
+        </div>
+        <span class="jr-caption">Tap a found page to read it again.</span>
+      </div>
+    </div>
+  </div>
+</div>

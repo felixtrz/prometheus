@@ -1,0 +1,420 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.DomeGradient": {
+      "sky": [
+        0.1,
+        0.36,
+        0.68,
+        1
+      ],
+      "equator": [
+        0.62,
+        0.8,
+        0.87,
+        1
+      ],
+      "ground": [
+        0.32,
+        0.38,
+        0.2,
+        1
+      ],
+      "intensity": 1
+    },
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [
+        0.53,
+        0.68,
+        0.81,
+        1
+      ],
+      "equator": [
+        0.72,
+        0.77,
+        0.65,
+        1
+      ],
+      "ground": [
+        0.28,
+        0.34,
+        0.17,
+        1
+      ],
+      "intensity": 0.8
+    }
+  },
+  "resources": {},
+  "authoring": {
+    "views": [
+      {
+        "id": "grove",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -7.4,
+          2.1,
+          -11.4
+        ],
+        "target": [
+          -17.4,
+          0.8,
+          -10.6
+        ],
+        "fov": 64
+      },
+      {
+        "id": "meadow",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          6.4,
+          2.1,
+          -12.6
+        ],
+        "target": [
+          17.6,
+          0.5,
+          -15.6
+        ],
+        "fov": 64
+      },
+      {
+        "id": "outpost",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          1.4,
+          2.5,
+          -25.6
+        ],
+        "target": [
+          -5.2,
+          1.1,
+          -33.2
+        ],
+        "fov": 64
+      },
+      {
+        "id": "spire",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          1.2,
+          5.793,
+          -43.6
+        ],
+        "target": [
+          5.2,
+          8.915,
+          -55
+        ],
+        "fov": 64
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "page-3",
+      "name": "Page 3",
+      "content": {
+        "type": "asset",
+        "asset": "page"
+      },
+      "transform": {
+        "position": [
+          -16.58,
+          0.935,
+          -10.03
+        ],
+        "rotationDeg": [
+          0,
+          35,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "page",
+          "uid": "page-3"
+        },
+        "Page": {
+          "index": 3
+        }
+      }
+    },
+    {
+      "id": "page-4",
+      "name": "Page 4",
+      "content": {
+        "type": "asset",
+        "asset": "page"
+      },
+      "transform": {
+        "position": [
+          18.666,
+          0.405,
+          -14.4
+        ],
+        "rotationDeg": [
+          0,
+          -20,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "page",
+          "uid": "page-4"
+        },
+        "Page": {
+          "index": 4
+        }
+      }
+    },
+    {
+      "id": "page-5",
+      "name": "Page 5",
+      "content": {
+        "type": "asset",
+        "asset": "page"
+      },
+      "transform": {
+        "position": [
+          -6.494,
+          1.499,
+          -30.778
+        ],
+        "rotationDeg": [
+          0,
+          96,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "page",
+          "uid": "page-5"
+        },
+        "Page": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "id": "page-6",
+      "name": "Page 6",
+      "content": {
+        "type": "asset",
+        "asset": "page"
+      },
+      "transform": {
+        "position": [
+          -0.5,
+          1.291,
+          -35.5
+        ],
+        "rotationDeg": [
+          0,
+          4,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "page",
+          "uid": "page-6"
+        },
+        "Page": {
+          "index": 6
+        }
+      }
+    },
+    {
+      "id": "page-7",
+      "name": "Page 7",
+      "content": {
+        "type": "asset",
+        "asset": "page"
+      },
+      "transform": {
+        "position": [
+          3.4,
+          7.101,
+          -52.7
+        ],
+        "rotationDeg": [
+          0,
+          160,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "page",
+          "uid": "page-7"
+        },
+        "Page": {
+          "index": 7
+        }
+      }
+    },
+    {
+      "id": "item-salvage-trigger",
+      "name": "Salvage Trigger",
+      "content": {
+        "type": "asset",
+        "asset": "trigger"
+      },
+      "transform": {
+        "position": [
+          -5.9,
+          1.13,
+          -29.003
+        ],
+        "rotationDeg": [
+          0,
+          38,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "trigger",
+          "uid": "item-salvage-trigger"
+        }
+      }
+    },
+    {
+      "id": "item-salvage-spring",
+      "name": "Salvage Spring",
+      "content": {
+        "type": "asset",
+        "asset": "spring"
+      },
+      "transform": {
+        "position": [
+          -5.684,
+          1.14,
+          -29.179
+        ],
+        "rotationDeg": [
+          0,
+          -12,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "spring",
+          "uid": "item-salvage-spring"
+        }
+      }
+    },
+    {
+      "id": "item-salvage-cloth",
+      "name": "Salvage Cloth",
+      "content": {
+        "type": "asset",
+        "asset": "cloth"
+      },
+      "transform": {
+        "position": [
+          -5.428,
+          1.223,
+          -29.136
+        ],
+        "rotationDeg": [
+          0,
+          108,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "cloth",
+          "uid": "item-salvage-cloth"
+        }
+      }
+    },
+    {
+      "id": "item-salvage-plank-1",
+      "name": "Salvage Plank 1",
+      "content": {
+        "type": "asset",
+        "asset": "plank"
+      },
+      "transform": {
+        "position": [
+          -6.462,
+          0.731,
+          -28.726
+        ],
+        "rotationDeg": [
+          0,
+          22,
+          90
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "plank",
+          "uid": "item-salvage-plank-1"
+        }
+      }
+    },
+    {
+      "id": "item-salvage-plank-2",
+      "name": "Salvage Plank 2",
+      "content": {
+        "type": "asset",
+        "asset": "plank"
+      },
+      "transform": {
+        "position": [
+          -6.58,
+          0.735,
+          -29.024
+        ],
+        "rotationDeg": [
+          0,
+          12,
+          90
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "plank",
+          "uid": "item-salvage-plank-2"
+        }
+      }
+    },
+    {
+      "id": "item-salvage-trigger-2",
+      "name": "Salvage Trigger 2",
+      "content": {
+        "type": "asset",
+        "asset": "trigger"
+      },
+      "transform": {
+        "position": [
+          0.72,
+          0.779,
+          -34.55
+        ],
+        "rotationDeg": [
+          0,
+          55,
+          0
+        ]
+      },
+      "components": {
+        "Item": {
+          "kind": "trigger",
+          "uid": "item-salvage-trigger-2"
+        }
+      }
+    }
+  ]
+}

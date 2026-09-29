@@ -1,0 +1,299 @@
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { mergeVertices, mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { gltsLoader, isPreview, loadingManager, onDispose, scene } from "@drawcall/glts";
+
+const root = new THREE.Group();
+scene.add(root);
+
+// Hero interaction props are composed from their own asset frames.
+const campfire = await gltsLoader.loadAsync(new URL("/tb34p7ucc3386u/index.glts", import.meta.url));
+campfire.position.set(0, 0, -0.42); campfire.scale.setScalar(0.94); root.add(campfire);
+const bench = await gltsLoader.loadAsync(new URL("/vny0u1b39m0cml/index.glts", import.meta.url));
+bench.position.set(-2.6, 0, -2.0); bench.rotation.y = Math.PI * 0.16; bench.scale.setScalar(0.78); root.add(bench);
+const backpack = await gltsLoader.loadAsync(new URL("/hbxtsc0nsbfyys/index.glts", import.meta.url));
+backpack.position.set(1.75, 0.018, 0.35); backpack.rotation.y = -Math.PI * 0.12; root.add(backpack);
+
+const gs: THREE.BufferGeometry[] = []; const ms: THREE.Material[] = []; const tx: THREE.Texture[] = [];
+const geo = <T extends THREE.BufferGeometry>(g: T) => (gs.push(g), g);
+const mat = <T extends THREE.Material>(m: T) => (ms.push(m), m);
+// Smooth-shaded variants of the platonic solids: merge duplicated vertices so normals interpolate.
+const smoothGeo = (g: THREE.BufferGeometry) => { const m = mergeVertices(g, 1e-4); m.computeVertexNormals(); g.dispose(); return geo(m); };
+const std = (color: number, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => mat(new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true, ...extra }));
+
+// ---------- Market models (Quaternius nature kit). Foliage gets bent normals (outward + up from the trunk axis) and is duplicated
+// with reversed winding so both faces shade like a soft canopy volume instead of flat planes going black on their back side.
+const draco = new DRACOLoader(loadingManager); draco.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/libs/draco/gltf/");
+const gltf = new GLTFLoader(loadingManager); gltf.setDRACOLoader(draco);
+const gltfOwned: THREE.Material[] = [];
+function bendNormals(g: THREE.BufferGeometry, center: THREE.Vector3, minY: number, height: number) {
+  const p = g.attributes.position as THREE.BufferAttribute; const n = new Float32Array(p.count * 3); const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { v.set(p.getX(i) - center.x, (p.getY(i) - minY) * .10 + height * .08, p.getZ(i) - center.z).normalize(); n[i * 3] = v.x; n[i * 3 + 1] = v.y; n[i * 3 + 2] = v.z; }
+  g.setAttribute("normal", new THREE.BufferAttribute(n, 3));
+}
+function twoSided(g: THREE.BufferGeometry) {
+  const back = g.clone(); const idx = back.getIndex();
+  if (idx) { const a = idx.array; for (let i = 0; i < a.length; i += 3) { const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t; } idx.needsUpdate = true; }
+  else { const p = back.attributes.position as THREE.BufferAttribute; for (let i = 0; i < p.count; i += 3) { const x = p.getX(i + 1), y = p.getY(i + 1), z = p.getZ(i + 1); p.setXYZ(i + 1, p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2)); p.setXYZ(i + 2, x, y, z); } }
+  const merged = mergeGeometries([g, back], false); back.dispose(); return merged;
+}
+async function loadModel(path: string, tint: THREE.Color, foliage = false) {
+  const g = await gltf.loadAsync(new URL(path, import.meta.url).href); const obj = g.scene;
+  const box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size); const center = new THREE.Vector3(); box.getCenter(center);
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh) {
+      m.castShadow = false; m.receiveShadow = false;
+      if (foliage) { const local = center.clone(); m.worldToLocal(local); const lb = new THREE.Box3().setFromBufferAttribute(m.geometry.attributes.position as THREE.BufferAttribute); bendNormals(m.geometry, local, lb.min.y, lb.max.y - lb.min.y); m.geometry = geo(twoSided(m.geometry)); }
+      else if (m.geometry && !m.geometry.attributes.normal) m.geometry.computeVertexNormals();
+      const arr = Array.isArray(m.material) ? m.material : [m.material];
+      for (const mm of arr) {
+        const s = mm as THREE.MeshStandardMaterial;
+        s.color.multiply(tint); s.roughness = 1; s.metalness = 0; s.flatShading = false;
+        s.transparent = false; s.depthWrite = true; s.depthTest = true; s.side = foliage ? THREE.FrontSide : THREE.DoubleSide;
+        s.alphaTest = (s.map && (s.map as THREE.Texture).format === THREE.RGBAFormat) || s.alphaMap ? .5 : 0;
+        if (foliage) { s.envMapIntensity = .45; } else s.envMapIntensity = 1;
+        s.needsUpdate = true; gltfOwned.push(s);
+      }
+    }
+  });
+  return { obj, height: size.y, minY: box.min.y };
+}
+const pine1 = await loadModel("/n62jpkl8yj9ugx/public/model/Pine_1.glb", new THREE.Color(0.74, 0.90, 0.58), true);
+const pine2 = await loadModel("/n2rbjo796m7iwc/public/model/Pine_2.glb", new THREE.Color(0.68, 0.86, 0.56), true);
+const rockModel = await loadModel("/cg0t9t85co2wwd/public/model/Rock_Medium_3.glb", new THREE.Color(0.68, 0.74, 0.80));
+
+// ---------- Materials: one shading model everywhere (MeshStandard, roughness 1, smooth normals, IBL ambient).
+const canopy = [std(0x8cbf3f), std(0x74a835), std(0xa3cc4d)];
+const trunkMat = std(0x8a5f3a), trunkDark = std(0x6b4830);
+const leafA = std(0x6fa03a), leafB = std(0x8dbb44), leafDark = std(0x5b8a33);
+const flowerY = std(0xf2d54a), flowerW = std(0xf6f2e6);
+const matBase = std(0x4d4238), matTop = std(0xb8956a), rollMat = std(0xc9a473), rollStripe = std(0x9c7a50), rollCore = std(0x7a5d3f), ropeMat = std(0xa98a57);
+const lanternMetal = std(0x4a4038, { roughness: .7, metalness: .15 }); const lanternGlass = mat(new THREE.MeshBasicMaterial({ color: 0xffc46a, transparent: true, opacity: .75 })); const lanternFlame = mat(new THREE.MeshBasicMaterial({ color: 0xfff1b0 }));
+const cupMat = std(0x8a5f3a); const pebbleA = std(0x8f959a), pebbleB = std(0x6f767c); const litterA = std(0x8a6a45);
+const ridgeNear = std(0x5b8168), ridgeMid = std(0x6c8fa3), ridgeFar = std(0x86a6c6), treelineMat = std(0x3f6b3c, { side: THREE.DoubleSide });
+const spireMat = std(0x8e949a), spireDark = std(0x6f767e); const cloudMat = std(0xf2f5f8, { emissive: new THREE.Color(0xc8d4e0), emissiveIntensity: .9, envMapIntensity: .2 }), cloudShade = cloudMat;
+
+function cylinderBetween(a: THREE.Vector3, b: THREE.Vector3, r: number, m: THREE.Material, seg = 12, parent: THREE.Object3D = root) {
+  const q = new THREE.Mesh(geo(new THREE.CylinderGeometry(r, r, a.distanceTo(b), seg)), m);
+  q.position.copy(a).add(b).multiplyScalar(.5); q.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); parent.add(q); return q;
+}
+
+// ---------- Baked contact shadows: recorded here, then multiplied into the ground vertex colours (no transparency, no realtime shadows).
+type Shade = { x: number; z: number; rx: number; rz: number; op: number; rot: number };
+const shades: Shade[] = [];
+const sunDir = new THREE.Vector3(7, -22, -11).normalize(); // key light direction (see rig below)
+const sunSlope = Math.hypot(sunDir.x, sunDir.z) / -sunDir.y; const sunAng = Math.atan2(sunDir.x, sunDir.z);
+function shadow(x: number, z: number, rx: number, rz: number, op: number, height = 0, rotY = 0) {
+  const off = height * sunSlope; shades.push({ x: x + Math.sin(sunAng) * off, z: z + Math.cos(sunAng) * off, rx, rz, op, rot: rotY });
+}
+function shadeAt(x: number, z: number) {
+  let k = 1;
+  for (const s of shades) {
+    const dx = x - s.x, dz = z - s.z; if (Math.abs(dx) > s.rx * 1.2 && Math.abs(dz) > s.rz * 1.2 && Math.abs(dx) + Math.abs(dz) > (s.rx + s.rz) * 1.2) continue;
+    const c = Math.cos(-s.rot), sn = Math.sin(-s.rot); const lx = (dx * c - dz * sn) / s.rx, lz = (dx * sn + dz * c) / s.rz;
+    const d = Math.hypot(lx, lz); if (d >= 1) continue;
+    const f = 1 - d * d; k *= 1 - s.op * f * f;
+  }
+  return k;
+}
+function treeShadow(x: number, z: number, h: number, canopyR: number, canopyY: number) {
+  shadow(x, z, canopyR * 1.45, canopyR * 1.45, .5, canopyY, 0);      // canopy shadow displaced along the sun
+  shadow(x, z, h * .06 + canopyR * .4, h * .06 + canopyR * .4, .45, 0); // trunk contact
+}
+
+// ---------- Ground: one vertex-painted mesh with a hand-painted mottle; dirt blends into grass through noisy falloff.
+function paintedMottle(size = 256) {
+  const grid = 32; const cells: number[] = []; let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < grid * grid; i++) cells.push(rnd());
+  const cell = (x: number, y: number) => cells[((y % grid + grid) % grid) * grid + ((x % grid + grid) % grid)];
+  const value = (u: number, v: number) => { const x = Math.floor(u), y = Math.floor(v); const fx = u - x, fy = v - y; const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy); return (cell(x, y) * (1 - sx) + cell(x + 1, y) * sx) * (1 - sy) + (cell(x, y + 1) * (1 - sx) + cell(x + 1, y + 1) * sx) * sy; };
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const u = x / size * grid, v = y / size * grid;
+    // fine speckle and short strokes dominate; the large octave is kept faint so the ground doesn't read as cloudy camouflage
+    let n = (value(u * .5, v * .5) - .5) * .22 + (value(u * 1.6 + 5, v * 1.6 + 2) - .5) * .38 + (value(u * 4.2 + 11, v * 4.2 + 7) - .5) * .40;
+    n += .16 * Math.sin(v * 16 + value(Math.floor(u * 4), 3) * 12) * (value(u * 5 + 20, v * 1.1 + 3) - .4);
+    n += (value(u * 9 + 31, v * 9 + 17) > .86 ? -.22 : 0); // sparse dark speckles
+    const m = Math.max(0, Math.min(255, Math.round((1 + n * .9) * 170)));
+    const i = (y * size + x) * 4; data[i] = data[i + 1] = data[i + 2] = m; data[i + 3] = 255;
+  }
+  const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(18, 18); t.anisotropy = 4; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; tx.push(t); return t;
+}
+const mottle = paintedMottle();
+const groundMat = mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }));
+const noise = (x: number, z: number) => .5 * Math.sin(x * 1.7 + z * .9) + .3 * Math.sin(x * .6 - z * 2.3 + 1.3) + .2 * Math.sin((x + z) * 3.1 + .7);
+const smooth = (a: number, b: number, v: number) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+const bumps = [[-7, -7, 4.5, .55], [7, -8, 5, .7], [-3, -13, 7, 1.1], [6, -14, 7.5, 1.2], [0, -22, 14, 1.3], [-12, -3, 4, .5], [12, -2, 4, .5]] as number[][];
+function terrainY(x: number, z: number) { let y = 0; for (const [bx, bz, bw, bh] of bumps) y += bh * Math.exp(-(((x - bx) / bw) ** 2 + ((z - bz) / bw) ** 2) * 1.6); return y + .04 * noise(x * .55, z * .55) - .035; }
+const pathPts = new THREE.QuadraticBezierCurve3(new THREE.Vector3(.1, 0, -1.6), new THREE.Vector3(-.9, 0, -5.5), new THREE.Vector3(.6, 0, -11)).getPoints(40);
+function dirtMask(x: number, z: number) {
+  const n = noise(x, z), n3 = noise(x * 4.5 + 9, z * 4.5 - 4);
+  const e = Math.sqrt((x / 4.0) ** 2 + ((z - .1) / 3.1) ** 2) + n * .12 + n3 * .07;
+  let d = smooth(1.08, .80, e);
+  let best = 99; for (const p of pathPts) { const dd = Math.hypot(x - p.x, z - p.z); if (dd < best) best = dd; }
+  return Math.max(d, smooth(.85, .45, best + n * .16 + n3 * .08));
+}
+// Low-poly terrain: jittered grid, one flat colour per triangle (non-indexed), flat shading so every facet reads.
+const groundGeo = geo(new THREE.PlaneGeometry(46, 46, 112, 112).toNonIndexed()); groundGeo.rotateX(-Math.PI / 2);
+function buildGround() {
+  const pos = groundGeo.attributes.position as THREE.BufferAttribute; const colors = new Float32Array(pos.count * 3);
+  const cGrassA = new THREE.Color(0x7fb038), cGrassB = new THREE.Color(0x9dcb46), cGrassC = new THREE.Color(0x5f9430), cDirtA = new THREE.Color(0xb98d57), cDirtB = new THREE.Color(0x9a6f42); const c = new THREE.Color();
+  const jit = (x: number, z: number) => { const a = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return a - Math.floor(a); };
+  // jitter shared grid vertices consistently (same input -> same offset) so triangles stay watertight
+  for (let i = 0; i < pos.count; i++) { const gx = pos.getX(i), gz = pos.getZ(i); const x = gx + (jit(gx, gz) - .5) * .26, z = gz + (jit(gz + 7, gx + 3) - .5) * .26; pos.setXYZ(i, x, terrainY(x, z - 12), z); }
+  for (let t = 0; t < pos.count; t += 3) {
+    const x = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3, z = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3 - 12;
+    const n = noise(x * .55, z * .55), n2 = noise(x * 2.2 + 3, z * 2.2 - 1); const fj = (jit(x * 3.1, z * 2.7) - .5) * .16;
+    c.copy(cGrassA).lerp(cGrassB, smooth(-.5, .6, n)).lerp(cGrassC, smooth(.2, .9, n2) * .35);
+    const dm = dirtMask(x, z); c.lerp(cDirtA.clone().lerp(cDirtB, smooth(-.3, .7, n2)), dm);
+    c.multiplyScalar(1 + fj - .12 * Math.sin(dm * Math.PI));
+    const k = shadeAt(x, z); c.multiplyScalar(k); c.b *= 1 + (1 - k) * .18;
+    for (let v = 0; v < 3; v++) { colors[(t + v) * 3] = c.r; colors[(t + v) * 3 + 1] = c.g; colors[(t + v) * 3 + 2] = c.b; }
+  }
+  groundGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3)); groundGeo.computeVertexNormals();
+  const ground = new THREE.Mesh(groundGeo, groundMat); ground.position.set(0, 0, -12); root.add(ground); return ground;
+}
+
+// ---------- Vegetation: broad curved blades in clumps (like the concept), two-sided with upward normals so no blade goes black.
+const bladeGeo = (() => {
+  const g = new THREE.PlaneGeometry(.11, .5, 1, 4); const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i) + .25; const t = y / .5; p.setX(i, p.getX(i) * (1 - t * .85)); p.setZ(i, t * t * .18); p.setY(i, y); }
+  const n = g.attributes.normal as THREE.BufferAttribute; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, .75, .66);
+  return geo(twoSided(g));
+})();
+function addTuft(x: number, z: number, s = 1, m: THREE.Material = leafA, flower: THREE.Material | null = null) {
+  const g = new THREE.Group(); const count = 5 + (Math.abs(Math.round(x * 7 + z * 3)) % 3);
+  for (let i = 0; i < count; i++) { const blade = new THREE.Mesh(bladeGeo, m); const a = i / count * Math.PI * 2 + x; blade.rotation.y = a; blade.rotation.x = -.55 - (i % 2) * .2; blade.position.set(Math.sin(a) * .03 * s, 0, Math.cos(a) * .03 * s); blade.scale.set(s * (1 + (i % 3) * .15), s * (.85 + (i % 2) * .3), s); g.add(blade); }
+  if (flower) for (let k = 0; k < 3; k++) { const st = new THREE.Mesh(geo(new THREE.CylinderGeometry(.006, .008, .3 * s, 5)), leafDark); st.position.set(Math.cos(k * 2.1) * .07 * s, .15 * s, Math.sin(k * 2.1) * .07 * s); g.add(st); const f = new THREE.Mesh(geo(new THREE.SphereGeometry(.04 * s, 8, 6)), flower); f.scale.y = .55; f.position.set(Math.cos(k * 2.1) * .07 * s, .31 * s, Math.sin(k * 2.1) * .07 * s); g.add(f); }
+  g.position.set(x, terrainY(x, z), z); root.add(g); shadow(x, z, .24 * s, .2 * s, .22);
+}
+for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; const r = 1 + noise(i, i * .3) * .18; const x = Math.cos(a) * 4.1 * r; const z = .1 + Math.sin(a) * 3.2 * r; if (z > 2.6 && Math.abs(x) < 1.2) continue; addTuft(x, z, .8 + (i % 3) * .3, [leafA, leafB, leafDark][i % 3], i % 5 === 0 ? flowerY : (i % 7 === 0 ? flowerW : null)); }
+for (const [x, z, s] of [[-2.9, 3.4, 1.7], [3.1, 3.2, 1.6], [-4.2, 2.6, 1.3], [4.6, 2.4, 1.3], [-1.3, 3.9, 1.1], [1.9, 3.9, 1.2], [-1.9, 2.75, 1.7], [2.25, 2.7, 1.6], [-.2, 3.6, 1.0]] as number[][]) addTuft(x, z, s, leafDark);
+for (const [x, z] of [[-.6, -3.4], [.9, -4.6], [-1.6, -6.6], [1.4, -7.9], [-1.2, -2.6], [1.3, -3.2]]) addTuft(x, z, .7, leafB, flowerY);
+// meadow scatter: clumps across the open grass so the field isn't bare, thinning with distance
+for (let i = 0; i < 70; i++) { const a = i * 2.399; const r = 4.8 + (i % 9) * .95 + noise(i * .7, i * .2) * .6; const x = Math.cos(a) * r * 1.35; const z = -1 + Math.sin(a) * r * .8; if (z > 3.2 || z < -16 || dirtMask(x, z) > .3) continue; const s = .8 + (i % 4) * .18; addTuft(x, z, s, [leafA, leafB, leafDark][i % 3], i % 6 === 0 ? flowerY : (i % 11 === 0 ? flowerW : null)); }
+
+const canopyGeo = geo(new THREE.IcosahedronGeometry(1, 2));
+function deciduous(x: number, z: number, h: number, rot: number, variant: number) {
+  const g = new THREE.Group(); const trunkH = h * .5;
+  const trunk = new THREE.Mesh(geo(new THREE.CylinderGeometry(h * .045, h * .07, trunkH, 7)), trunkMat); trunk.position.y = trunkH / 2; g.add(trunk);
+  for (let i = 0; i < 3; i++) { const a = rot + i * 2.1; cylinderBetween(new THREE.Vector3(0, trunkH * (.55 + i * .15), 0), new THREE.Vector3(Math.cos(a) * h * .22, trunkH + h * .12, Math.sin(a) * h * .22), h * .022, trunkDark, 5, g); }
+  [[0, .70, 0, .34], [-.26, .58, .12, .26], [.27, .60, -.10, .27], [.05, .56, .28, .24], [-.06, .58, -.27, .23], [-.14, .82, -.04, .22], [.18, .80, .08, .21]].forEach(([bx, by, bz, br], i) => { const b = new THREE.Mesh(canopyGeo, canopy[(i + variant) % 3]); b.position.set(bx * h, by * h, bz * h); b.scale.setScalar(br * h); b.rotation.set(i * .7, i * 1.3, i * .4); g.add(b); });
+  g.position.set(x, 0, z); g.rotation.y = rot; root.add(g); treeShadow(x, z, h, h * .36, h * .6);
+}
+deciduous(-4.9, 2.0, 4.6, .4, 0); deciduous(4.6, 1.9, 4.2, 1.9, 1); deciduous(-7.2, -3.6, 4.0, 2.6, 2); deciduous(7.4, -4.2, 4.4, .9, 0); deciduous(-6.4, -8.4, 3.6, 1.2, 1); deciduous(6.8, -9.2, 3.8, 3.4, 2);
+
+function placePine(x: number, z: number, h: number, rot: number, variant: number, near: boolean) {
+  const src = variant % 2 ? pine2 : pine1; const p = src.obj.clone(); const s = h / src.height;
+  p.scale.setScalar(s); p.position.set(x, -src.minY * s, z); p.rotation.y = rot; root.add(p);
+  if (near) treeShadow(x, z, h, h * .24, h * .5);
+  return p;
+}
+for (const [x, z, h, r, v] of [[-5.2, -1.6, 5.0, .2, 0], [5.4, -1.8, 5.2, -.2, 1], [-3.4, -5.6, 4.4, .7, 1], [3.6, -6.0, 4.8, -.6, 0], [-9.5, -6, 4.2, 1.4, 1], [9.8, -6.5, 4.4, 2.2, 0]] as number[][]) placePine(x, z, h, r, v, true);
+for (let i = 0; i < 14; i++) { const x = -10.5 + i * 1.62 + ((i % 3) - 1) * .3; const z = -9.2 - (i % 3) * .9; if (Math.abs(x) < 1.6) continue; placePine(x, z, 3.4 + (i % 4) * .45, (i * .61) % 6.28, i % 2, false); }
+for (let i = 0; i < 18; i++) { const x = -13.5 + i * 1.58; const z = -13 - (i % 4) * .7; placePine(x, z, 3.0 + (i % 3) * .5, (i * .83) % 6.28, (i + 1) % 2, false); }
+
+function placeRock(x: number, z: number, s: number, rot: number) {
+  const r = rockModel.obj.clone(); const k = s / rockModel.height;
+  r.scale.set(k * 1.15, k, k * .95); r.position.set(x, -rockModel.minY * k, z); r.rotation.y = rot; root.add(r);
+  shadow(x, z, s * 1.4, s * 1.2, .3, s * .3); return r;
+}
+for (const [x, z, s, r] of [[-3.3, 1.7, .40, .3], [3.6, 1.4, .46, 1.2], [-2.3, -4.4, .34, 2.4], [2.0, -4.9, .50, .8], [-5.2, -5.8, .70, 1.9], [5.3, -6.2, .62, .4], [-6.1, .6, .44, 2.8], [-2.6, 3.6, .55, 1.1], [2.9, 3.7, .48, 2.0], [-8.5, -9, .9, .5], [8.4, -10, 1.0, 2.2]] as number[][]) placeRock(x, z, s, r);
+
+// ---------- Horizon: smooth, sun-shaded mountain masses (lit face / shade face like the concept), a dark tree-line, and the rock-spire landmark.
+function mountain(x: number, z: number, w: number, h: number, d: number, m: THREE.Material, rot = 0) {
+  const g = geo(new THREE.ConeGeometry(1, 1, 30, 9)); const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) { const px = p.getX(i), py = p.getY(i) + .5, pz = p.getZ(i); const a = Math.atan2(pz, px); const wob = 1 + .10 * Math.sin(a * 3 + x) + .06 * Math.sin(a * 7 + z) + .035 * Math.sin(a * 13 + py * 9 + x); const flare = (1 + (1 - py) * .30) * (1 + .9 * py * (1 - py)); p.setXYZ(i, px * wob * flare, py - .5 + .012 * Math.sin(a * 11 + py * 17), pz * wob * flare); }
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, m); mesh.scale.set(w, h, d); mesh.position.set(x, h * .5 - .3, z); mesh.rotation.y = rot; root.add(mesh); return mesh;
+}
+mountain(-30, -46, 26, 10, 12, ridgeFar, .3); mountain(-8, -50, 30, 12.5, 14, ridgeFar, 1.1); mountain(18, -48, 28, 11, 12, ridgeFar, 2.2);
+mountain(-22, -40, 18, 7.5, 9, ridgeMid, .6); mountain(2, -42, 22, 8.5, 10, ridgeMid, 1.9); mountain(24, -41, 17, 7, 8, ridgeMid, .2);
+mountain(-13, -34, 12, 4.4, 6, ridgeNear, 1.4); mountain(8, -35, 13, 4.8, 6.5, ridgeNear, .9);
+{ const pts: [number, number][] = []; for (let i = 0; i <= 60; i++) { const x = -30 + i; pts.push([x, 2.6 + (i % 2 ? .6 : 0) + (i % 5 === 0 ? .4 : 0)]); } const sh = new THREE.Shape(); sh.moveTo(pts[0][0], -2); for (const [x, y] of pts) sh.lineTo(x, y); sh.lineTo(30, -2); sh.closePath(); const tl = new THREE.Mesh(geo(new THREE.ShapeGeometry(sh)), treelineMat); tl.position.set(0, 0, -27); root.add(tl); }
+{
+  const sh = new THREE.Shape(); for (const [x, y] of [[-2.2, 0], [-1.6, 3.5], [-1.9, 5.5], [-1.0, 8.5], [-.4, 11.2], [.4, 11.6], [1.1, 9.0], [1.9, 6.0], [1.5, 3.2], [2.3, 0]] as number[][]) sh.lineTo(x, y); sh.closePath();
+  const hole = new THREE.Path(); hole.absarc(.15, 8.6, .85, 0, Math.PI * 2, true); sh.holes.push(hole);
+  const spire = new THREE.Mesh(geo(new THREE.ExtrudeGeometry(sh, { depth: 2.4, bevelEnabled: true, bevelSize: .45, bevelThickness: .45, bevelSegments: 1 })), spireMat);
+  spire.position.set(9.5, 2.0, -40); spire.rotation.y = .35; spire.scale.setScalar(.75); root.add(spire);
+  const base = new THREE.Mesh(geo(new THREE.DodecahedronGeometry(2.4, 1)), spireDark); base.scale.set(1.6, .7, 1.1); base.position.set(9.3, 2.2, -39.5); root.add(base);
+}
+// Low-poly cumulus: clusters of flat-shaded icosahedra, near-unlit so the underside stays a light grey.
+const cloudGeo = geo(new THREE.IcosahedronGeometry(1, 2));
+function cloud(x: number, y: number, z: number, s: number) {
+  const g = new THREE.Group(); const parts = [[-.9, .0, .55, .40], [-.45, .18, .70, .56], [.1, .28, .82, .66], [.65, .14, .62, .48], [1.1, -.02, .44, .34], [-.2, -.06, 1.05, .30], [.55, -.06, .95, .30]];
+  parts.forEach(([px, py, sx, sy], i) => { const c = new THREE.Mesh(cloudGeo, cloudMat); c.position.set(px * s, py * s, 0); c.scale.set(sx * s, sy * s, .55 * s); c.rotation.set(i * .9, i * .5, i * 1.1); g.add(c); });
+  g.position.set(x, y, z); root.add(g);
+}
+cloud(-12, 12.5, -34, 2.6); cloud(4, 14.5, -36, 3.2); cloud(16, 12, -34, 2.2); cloud(-3, 11.2, -33, 1.4);
+
+// ---------- Camp dressing: bedroll on a padded mat, lantern on a rock, wooden cup, firewood.
+{
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(geo(new THREE.BoxGeometry(1.7, .11, 1.0)), matBase); base.position.y = .055; g.add(base);
+  const top = new THREE.Mesh(geo(new THREE.BoxGeometry(1.56, .06, .88)), matTop); top.position.y = .13; g.add(top);
+  const roll = new THREE.Mesh(geo(new THREE.CylinderGeometry(.24, .24, 1.25, 9)), rollMat); roll.rotation.z = Math.PI / 2; roll.position.set(-.04, .40, -.12); g.add(roll);
+  for (const dx of [-.42, .38]) { const st = new THREE.Mesh(geo(new THREE.CylinderGeometry(.25, .25, .09, 9)), rollStripe); st.rotation.z = Math.PI / 2; st.position.set(dx, .40, -.12); g.add(st); }
+  for (const side of [-1, 1]) { const end = new THREE.Mesh(geo(new THREE.CylinderGeometry(.20, .20, .02, 9)), rollCore); end.rotation.z = Math.PI / 2; end.position.set(side * .635, .40, -.12); g.add(end); for (const r of [.06, .12]) { const sp = new THREE.Mesh(geo(new THREE.TorusGeometry(r, .012, 4, 9)), rollStripe); sp.rotation.y = Math.PI / 2; sp.position.set(side * .648, .40, -.12); g.add(sp); } }
+  for (const dx of [-.42, .38]) { const tie = new THREE.Mesh(geo(new THREE.TorusGeometry(.25, .014, 4, 9)), ropeMat); tie.rotation.y = Math.PI / 2; tie.position.set(dx, .40, -.12); g.add(tie); }
+  g.position.set(-2.4, 0, -.35); g.rotation.y = -.95; g.scale.setScalar(.8); root.add(g);
+  shadow(-2.4, -.35, .85, 1.05, .32, .05, -.95);
+}
+{
+  placeRock(2.35, -1.45, .62, .9);
+  const g = new THREE.Group(); const cyl = (rt: number, rb: number, h: number, y: number, m: THREE.Material) => { const c = new THREE.Mesh(geo(new THREE.CylinderGeometry(rt, rb, h, 12)), m); c.position.y = y; g.add(c); return c; };
+  cyl(.09, .11, .05, .025, lanternMetal); cyl(.075, .075, .18, .14, lanternGlass); cyl(.10, .08, .05, .255, lanternMetal); cyl(.03, .03, .04, .29, lanternMetal);
+  for (const y of [.09, .19]) { const ring = new THREE.Mesh(geo(new THREE.TorusGeometry(.078, .006, 5, 16)), lanternMetal); ring.rotation.x = Math.PI / 2; ring.position.y = y; g.add(ring); }
+  const fl = new THREE.Mesh(geo(new THREE.SphereGeometry(.03, 8, 6)), lanternFlame); fl.position.y = .13; g.add(fl);
+  const handle = new THREE.Mesh(geo(new THREE.TorusGeometry(.10, .008, 6, 20, Math.PI)), lanternMetal); handle.position.y = .32; g.add(handle);
+  g.position.set(2.35, .60, -1.45); root.add(g);
+  const glow = new THREE.PointLight(0xffb45a, .9, 2.2, 2); glow.position.set(2.35, .78, -1.45); root.add(glow);
+}
+{ const cup = new THREE.Mesh(geo(new THREE.CylinderGeometry(.07, .06, .12, 12, 1, true)), cupMat); cup.position.set(.95, .06, .55); root.add(cup); const bottom = new THREE.Mesh(geo(new THREE.CircleGeometry(.06, 12)), cupMat); bottom.rotation.x = -Math.PI / 2; bottom.position.set(.95, .005, .55); root.add(bottom); shadow(.95, .55, .12, .12, .3); }
+for (let i = 0; i < 5; i++) { const k = new THREE.Mesh(geo(new THREE.CylinderGeometry(.045, .05, .48, 9)), trunkDark); k.rotation.z = Math.PI / 2; k.rotation.y = -.25 + i * .08; k.position.set(-1.55 + i * .09, .05 + (i > 2 ? .08 : 0), 1.75 + i * .03); root.add(k); }
+shadow(-1.35, 1.8, .45, .3, .3, .05);
+
+// Small ground storytelling: pebbles and litter across the dirt.
+const pebbleGeo = geo(new THREE.DodecahedronGeometry(.045, 0));
+const litterGeo = geo(new THREE.CircleGeometry(.055, 8));
+for (let i = 0; i < 16; i++) { const a = i * .91; const r = 1.55 + (i % 5) * .5; const x = Math.cos(a) * r; const z = .25 + Math.sin(a) * r * .7; if (Math.abs(x) < .85 && z < .8) continue; const p = new THREE.Mesh(pebbleGeo, i % 2 ? pebbleA : pebbleB); p.scale.set(1 + (i % 2) * .35, .42, .75 + (i % 4) * .12); p.position.set(x, terrainY(x, z) + .03, z); p.rotation.y = a * .7; root.add(p); }
+// pebbles along the path edges
+for (let i = 0; i < 22; i++) { const t = i / 22; const pt = pathPts[Math.floor(t * 39)]; const side = i % 2 ? 1 : -1; const x = pt.x + side * (.55 + (i % 3) * .12), z = pt.z + (i % 4) * .05; const p = new THREE.Mesh(pebbleGeo, i % 3 ? pebbleA : pebbleB); p.scale.set(.9 + (i % 3) * .3, .45, .8 + (i % 2) * .3); p.position.set(x, terrainY(x, z) + .025, z); p.rotation.y = i; root.add(p); }
+for (let i = 0; i < 20; i++) { const a = i * 1.37; const r = 1.25 + (i % 7) * .43; const x = Math.cos(a) * r; const z = .15 + Math.sin(a) * r * .68; const l = new THREE.Mesh(litterGeo, litterA); l.rotation.x = -Math.PI / 2; l.rotation.z = a * .55; l.scale.set(1.0 + (i % 3) * .35, .35, 1); l.position.set(x, .016, z); root.add(l); }
+for (const [x, z, s, r] of [[.5, -2.4, .13, 0], [.2, -3.4, .11, 1], [-.2, -4.4, .12, 2], [-.4, -5.5, .10, 3], [-.2, -6.7, .11, 4], [.1, -8.0, .10, 5]] as number[][]) { const st = placeRock(x, z, s, r); st.scale.y *= .4; }
+
+// Prop contact shadows (fire ring, bench, backpack), then bake everything into the ground.
+shadow(0, -.42, 1.25, 1.1, .35, .1); shadow(-2.6, -2.0, 1.35, .7, .35, .1, Math.PI * .16); shadow(1.75, .35, 1.2, .8, .3, .05, -Math.PI * .12);
+buildGround();
+
+// Bright painterly sky.
+const skyMat = mat(new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: { top: { value: new THREE.Color(0x2e6fd3) }, mid: { value: new THREE.Color(0x6fb0ee) }, bottom: { value: new THREE.Color(0xc7e6f9) } }, vertexShader: `varying float vY; void main(){vec4 wp=modelMatrix*vec4(position,1.0); vY=normalize(wp.xyz).y; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`, fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; varying float vY; void main(){vec3 c=mix(bottom,mid,smoothstep(0.0,0.22,vY)); c=mix(c,top,smoothstep(0.22,0.75,vY)); gl_FragColor=vec4(c,1.0);}` }));
+root.add(new THREE.Mesh(geo(new THREE.SphereGeometry(80, 24, 12)), skyMat));
+
+// Quest target: no realtime shadows. Ambient from a procedural sky→horizon→grass gradient environment (matches the painterly sky,
+// no dark forest canopy bleeding into the trees); one sun; contact shadows baked into the ground above.
+function gradientEnv(w = 64, h = 32) {
+  const top = new THREE.Color(0x4f86d6), horizon = new THREE.Color(0xdbe9f3), ground = new THREE.Color(0x9bb060), groundDeep = new THREE.Color(0x6f8442);
+  const d = new Uint8Array(w * h * 4); const c = new THREE.Color();
+  for (let y = 0; y < h; y++) { const v = 1 - (y + .5) / h; // 1 = zenith, 0 = nadir
+    if (v > .5) c.copy(horizon).lerp(top, Math.pow((v - .5) / .5, .7)); else c.copy(ground).lerp(groundDeep, Math.pow((.5 - v) / .5, .8)).lerp(horizon, Math.max(0, 1 - (.5 - v) / .08) * .6);
+    for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; d[i] = Math.round(c.r * 255); d[i + 1] = Math.round(c.g * 255); d[i + 2] = Math.round(c.b * 255); d[i + 3] = 255; } }
+  const t = new THREE.DataTexture(d, w, h, THREE.RGBAFormat); t.colorSpace = THREE.SRGBColorSpace; t.mapping = THREE.EquirectangularReflectionMapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter; t.needsUpdate = true; tx.push(t); return t;
+}
+scene.environment = gradientEnv(); scene.environmentIntensity = .55;
+// Atmospheric perspective: linear fog toward the sky-horizon tint. The sky sphere ignores fog (ShaderMaterial), so only the world recedes.
+scene.fog = new THREE.Fog(0xc3dcef, 14, 120);
+const hemi = new THREE.HemisphereLight(0xb9d6ff, 0x73824a, .15);
+const key = new THREE.DirectionalLight(0xfff1d4, 1.7); key.position.set(-7, 22, 9); key.target.position.set(0, 0, -2);
+// cool back-fill lifts silhouettes off the tree line without adding a second visible light direction
+const rim = new THREE.DirectionalLight(0x9fc3ff, .35); rim.position.set(6, 9, -12); rim.target.position.set(0, 1, 0);
+root.add(hemi, key, key.target, rim, rim.target);
+
+scene.defaultCamera = new THREE.PerspectiveCamera(58, 1, .1, 300); scene.defaultCamera.position.set(0, 1.55, 4.3); scene.defaultCamera.lookAt(0, .85, -1.2);
+if (isPreview) { scene.rendering.toneMapping = THREE.ACESFilmicToneMapping; scene.rendering.toneMappingExposure = 1.0; }
+
+onDispose(() => { for (const g of gs) g.dispose(); for (const m of ms) m.dispose(); for (const t of tx) t.dispose(); for (const m of gltfOwned) m.dispose(); draco.dispose(); });

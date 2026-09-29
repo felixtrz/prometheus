@@ -1,0 +1,150 @@
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { isPreview, loadingManager, onDispose, scene } from "@drawcall/glts";
+
+const root = new THREE.Group();
+root.scale.setScalar(0.62); // authored to a plausible ~1.5 m x 1.0 m unrolled footprint
+scene.add(root);
+const gs: THREE.BufferGeometry[]=[]; const ms: THREE.Material[]=[]; const tx: THREE.Texture[]=[];
+const geo=<T extends THREE.BufferGeometry>(g:T)=>(gs.push(g),g); const mat=<T extends THREE.Material>(m:T)=>(ms.push(m),m);
+
+// Procedural low-frequency weave and leather grain: cheap, stylized, no photoreal microdetail.
+function weaveTexture(base:[number,number,number], contrast=10, size=64, repeat:[number,number]=[6,4]){
+  const data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const i=(y*size+x)*4; const warp=(x%8<2?contrast:0)+(y%8>=4&&y%8<6?contrast*.65:0); const n=((x*7+y*11)%7)-3;
+    data[i]=Math.max(0,Math.min(255,base[0]+warp+n)); data[i+1]=Math.max(0,Math.min(255,base[1]+warp*.82+n)); data[i+2]=Math.max(0,Math.min(255,base[2]+warp*.62+n)); data[i+3]=255;
+  }
+  const t=new THREE.DataTexture(data,size,size,THREE.RGBAFormat); t.needsUpdate=true; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(repeat[0],repeat[1]); t.colorSpace=THREE.SRGBColorSpace; t.magFilter=THREE.LinearFilter; tx.push(t); return t;
+}
+function grainTexture(base:[number,number,number], size=64){
+  const data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const i=(y*size+x)*4; const wave=Math.sin(y*.35)*7+Math.sin((x+y)*.15)*4; const n=((x*13+y*17)%9)-4; const v=wave+n;
+    data[i]=Math.max(0,Math.min(255,base[0]+v)); data[i+1]=Math.max(0,Math.min(255,base[1]+v*.7)); data[i+2]=Math.max(0,Math.min(255,base[2]+v*.5)); data[i+3]=255;
+  }
+  const t=new THREE.DataTexture(data,size,size,THREE.RGBAFormat); t.needsUpdate=true; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,2); t.colorSpace=THREE.SRGBColorSpace; tx.push(t); return t;
+}
+const canvasMap=weaveTexture([176,176,176],12,64,[3.5,2.2]); const leatherMap=grainTexture([176,176,176]);
+const canvas=mat(new THREE.MeshStandardMaterial({color:0x8a7358,map:canvasMap,roughness:.98}));
+const canvasMid=mat(new THREE.MeshStandardMaterial({color:0x9c826a,map:canvasMap,roughness:.97}));
+const canvasLight=mat(new THREE.MeshStandardMaterial({color:0xb59a76,map:canvasMap,roughness:.97}));
+const binding=mat(new THREE.MeshStandardMaterial({color:0xc9a86f,roughness:.94}));
+const leather=mat(new THREE.MeshStandardMaterial({color:0x6b4a34,map:leatherMap,roughness:.90}));
+const leatherLight=mat(new THREE.MeshStandardMaterial({color:0xa07248,map:leatherMap,roughness:.87}));
+const brass=mat(new THREE.MeshStandardMaterial({color:0xc4954f,roughness:.55,metalness:.22}));
+const wood=mat(new THREE.MeshStandardMaterial({color:0x80502d,roughness:.92}));
+const woodLight=mat(new THREE.MeshStandardMaterial({color:0xa46c3a,roughness:.88}));
+const metal=mat(new THREE.MeshStandardMaterial({color:0x72797f,roughness:.64,metalness:.09}));
+const metalDark=mat(new THREE.MeshStandardMaterial({color:0x50575c,roughness:.73,metalness:.07}));
+const mushCap=mat(new THREE.MeshStandardMaterial({color:0xb2513a,roughness:.92})); const mushStem=mat(new THREE.MeshStandardMaterial({color:0xd7bb8b,roughness:1}));
+const ropeMat=mat(new THREE.MeshStandardMaterial({color:0xc3a56b,roughness:1}));
+const berryMat=mat(new THREE.MeshStandardMaterial({color:0x506daa,roughness:.82})); const berryDark=mat(new THREE.MeshStandardMaterial({color:0x3f5d91,roughness:.86}));
+const meat=mat(new THREE.MeshStandardMaterial({color:0x944d48,roughness:.84})); const fat=mat(new THREE.MeshStandardMaterial({color:0xd2a37f,roughness:.9}));
+const stoneMat=mat(new THREE.MeshStandardMaterial({color:0x777e80,roughness:.97}));
+const shadow=mat(new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.12,depthWrite:false}));
+
+function chamfer(size:[number,number,number],_r:number,pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root){const mesh=new THREE.Mesh(geo(new THREE.BoxGeometry(size[0],size[1],size[2])),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
+function box(size:[number,number,number],pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root){const mesh=new THREE.Mesh(geo(new THREE.BoxGeometry(...size)),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
+function cyl(rt:number,rb:number,h:number,seg:number,pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root){const mesh=new THREE.Mesh(geo(new THREE.CylinderGeometry(rt,rb,h,Math.min(seg,9))),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
+function torus(r:number,tube:number,pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root,arc=Math.PI*2){const mesh=new THREE.Mesh(geo(new THREE.TorusGeometry(r,tube,4,10,arc)),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
+for(const m of ms){const s=m as THREE.MeshStandardMaterial; if(s.isMeshStandardMaterial) s.flatShading=true;}
+
+// Main unrolled canvas: mostly crisp panels with subtle fold articulation.
+box([2.40,.045,1.58],[0,.028,0],canvas);
+for(const [x,m,dy] of [[-.78,canvasMid,.004],[0,canvasLight,0],[.78,canvasMid,-.004]] as [number,THREE.Material,number][]){const p=box([.77,.035,1.54],[x,.060+dy,0],m);p.rotation.z=x*.008;}
+// Perimeter binding and central fold strips.
+for(const z of [-.78,.78]) chamfer([2.44,.030,.038],.006,[0,.092,z],binding);
+for(const x of [-1.20,1.20]) chamfer([.038,.030,1.58],.006,[x,.092,0],binding);
+for(const x of [-.39,.39]) chamfer([.030,.022,1.52],.005,[x,.092,0],binding);
+
+const cols=[-.74,0,.74], rows=[-.47,0,.47];
+for(const x of cols) for(const z of rows){
+  // Pocket is a shallow fabric panel with a folded top lip and stitched edge.
+  box([.61,.024,.38],[x,.128,z],canvas);
+  chamfer([.63,.030,.025],.005,[x,.153,z-.203],binding); chamfer([.63,.030,.025],.005,[x,.153,z+.203],binding);
+  chamfer([.025,.030,.405],.005,[x-.317,.153,z],binding); chamfer([.025,.030,.405],.005,[x+.317,.153,z],binding);
+  box([.52,.024,.032],[x,.169,z+.168],canvasLight);
+  for(const sx of [-1,1]) cyl(.009,.009,.010,10,[x+sx*.245,.178,z+.168],brass);
+}
+
+// Rolled backpack body: one clean leather roll on a wooden dowel, two wide straps with buckles, spiral ends, carry handle.
+const rollX=-1.36, rollY=.30, rollR=.28;
+const rollLeather=mat(new THREE.MeshStandardMaterial({color:0x6e4b34,map:leatherMap,roughness:.92,flatShading:true}));
+const rollLeatherDark=mat(new THREE.MeshStandardMaterial({color:0x4f3525,map:leatherMap,roughness:.94,flatShading:true}));
+const roll=cyl(rollR,rollR,1.42,32,[rollX,rollY,0],rollLeather); roll.rotation.x=Math.PI/2;
+// slight seam where the outer wrap ends, read as a soft ridge instead of a separate shell
+const seam=cyl(rollR+.006,rollR+.006,1.40,32,[rollX,rollY,0],rollLeatherDark); seam.rotation.x=Math.PI/2; seam.scale.set(1,1,.14); seam.rotation.z=.9;
+for(const side of [-1,1]){
+  const end=cyl(rollR-.02,rollR-.02,.024,32,[rollX,rollY,side*.71],rollLeatherDark); end.rotation.x=Math.PI/2;
+  for(const r of [.07,.14,.21]) torus(r,.010,[rollX,rollY,side*.724],binding);
+}
+// wooden dowel through the roll, ends protruding
+const dowel=cyl(.045,.045,1.9,14,[rollX,rollY,0],wood); dowel.rotation.x=Math.PI/2;
+for(const side of [-1,1]) cyl(.05,.05,.04,14,[rollX,rollY,side*.93],woodLight).rotation.x=Math.PI/2;
+// two wide leather straps wrapped fully around, buckle and keeper on top
+for(const z of [-.40,.40]){
+  const strap=cyl(rollR+.018,rollR+.018,.16,32,[rollX,rollY,z],leather); strap.rotation.x=Math.PI/2;
+  chamfer([.20,.036,.17],.006,[rollX,rollY+rollR+.02,z],brass);
+  box([.09,.044,.19],[rollX+.06,rollY+rollR+.024,z],leatherLight);
+  cyl(.012,.012,.17,8,[rollX-.03,rollY+rollR+.04,z],brass).rotation.x=Math.PI/2;
+}
+// carry handle between the straps
+torus(.16,.024,[rollX,rollY+rollR,0],leatherLight,root,Math.PI).rotation.y=Math.PI/2;
+// hinge flap from the roll into the inventory mat, with grommets
+box([.30,.052,1.46],[-1.10,.145,0],leather);
+for(const z of [-.55,-.28,0,.28,.55]) torus(.022,.008,[-.95,.185,z],brass).rotation.x=Math.PI/2;
+
+// Inventory objects: one chunky, readable item per cell, sized for a VR grab, two cells left empty.
+function item(x:number,z:number,build:(g:THREE.Group)=>void,rotY=0,s=1.55){const g=new THREE.Group();g.position.set(x,.155,z);g.rotation.y=rotY;g.scale.setScalar(s);build(g);root.add(g);}
+
+item(-.74,-.47,(g)=>{ // mushroom
+  cyl(.045,.062,.16,14,[0,.08,0],mushStem,g);
+  const cap=new THREE.Mesh(geo(new THREE.IcosahedronGeometry(.135,1)),mushCap);cap.scale.y=.62;cap.position.y=.165;g.add(cap);
+  torus(.082,.010,[0,.145,0],mushStem,g).rotation.x=Math.PI/2;
+},.3);
+item(0,-.47,(g)=>{ // rope coil
+  for(const [r,y] of [[.14,.03],[.108,.052],[.076,.070]] as [number,number][]) torus(r,.026,[0,y,0],ropeMat,g).rotation.x=Math.PI/2;
+  box([.05,.028,.17],[0,.085,0],leatherLight,g).rotation.y=.25;
+},.2);
+item(.74,-.47,(g)=>{ // stick bundle
+  for(const dz of [-.06,0,.06]){const s=cyl(.033,.040,.30,12,[0,.038,dz],dz===0?woodLight:wood,g);s.rotation.z=Math.PI/2;}
+  torus(.078,.011,[0,.040,0],leather,g).rotation.y=Math.PI/2;
+},-.15);
+item(-.80,0,(g)=>{ // hatchet
+  const h1=cyl(.030,.036,.22,12,[-.04,.036,0],wood,g);h1.rotation.z=Math.PI/2;
+  const grip=cyl(.034,.040,.10,12,[.10,.040,0],woodLight,g);grip.rotation.z=Math.PI/2;
+  chamfer([.14,.11,.07],.010,[.19,.055,0],metal,g);
+  box([.04,.075,.078],[.27,.06,0],metalDark,g).rotation.z=.20;
+},.12,1.3);
+item(0,0,(g)=>{ // berries
+  for(const [dx,dz,alt] of [[-.065,-.04,0],[.04,-.05,1],[-.02,.05,0],[.08,.04,1],[-.08,.07,0],[.015,.085,1],[.0,-.0,1]] as [number,number,number][]){
+    const b=new THREE.Mesh(geo(new THREE.IcosahedronGeometry(.052,0)),alt?berryDark:berryMat);b.position.set(dx,.052,dz);b.rotation.set(dx*9,dz*7,0);g.add(b);cyl(.009,.012,.024,5,[dx,.10,dz],leatherLight,g);
+  }
+});
+item(.74,0,(g)=>{ // meat cut
+  chamfer([.25,.075,.17],.014,[0,.038,0],meat,g);
+  box([.21,.016,.04],[0,.078,-.045],fat,g);
+},.24);
+item(-.74,.47,(g)=>{ // flint stone
+  const stone=new THREE.Mesh(geo(new THREE.IcosahedronGeometry(.13,1)),stoneMat);stone.scale.set(1.15,.72,.9);stone.position.y=.09;stone.rotation.set(.12,.3,.05);g.add(stone);
+});
+
+// A small repair patch makes the object feel used without requiring a heavy texture set.
+box([.22,.012,.16],[.66,.102,.60],leatherLight).rotation.y=-.10;
+for(const z of [.54,.66]) for(const x of [.58,.74]) cyl(.007,.007,.010,8,[x,.112,z],brass);
+
+scene.defaultCamera=new THREE.PerspectiveCamera(40,1,.1,100);scene.defaultCamera.position.set(1.30,1.55,1.70);scene.defaultCamera.lookAt(-.08,.10,0);
+if(isPreview){
+  scene.background=new THREE.Color(0xc9d3bd);
+  const hemi=new THREE.HemisphereLight(0xe8f1df,0x68704f,1.0);const key=new THREE.DirectionalLight(0xffefd4,1.6);key.position.set(3.5,5,4);scene.add(hemi,key);
+  const seg=26, rings=7; const pos:number[]=[], col:number[]=[]; const gA=new THREE.Color(0x7fb038), gB=new THREE.Color(0x9dcb46), dA=new THREE.Color(0xb98d57), dB=new THREE.Color(0x9a6f42); const c=new THREE.Color();
+  const pt=(r:number,a:number)=>{const j=Math.sin(r*7.1+a*13.3)*.5+.5;return [Math.cos(a)*(r+(j-.5)*.18), Math.sin(a)*(r+(j-.5)*.18)];};
+  for(let ri=0;ri<rings;ri++){const r0=ri*4.5/rings, r1=(ri+1)*4.5/rings; for(let s=0;s<seg;s++){const a0=s/seg*Math.PI*2,a1=(s+1)/seg*Math.PI*2; const [x0,z0]=pt(r0,a0),[x1,z1]=pt(r0,a1),[x2,z2]=pt(r1,a0),[x3,z3]=pt(r1,a1);
+    const tris=r0===0?[[0,0,x3,z3,x2,z2]]:[[x0,z0,x3,z3,x2,z2],[x0,z0,x1,z1,x3,z3]];
+    for(const t of tris){const cx=(t[0]+t[2]+t[4])/3,cz=(t[1]+t[3]+t[5])/3; const d=Math.hypot(cx*.9,cz*1.2); const dirt=Math.max(0,Math.min(1,(1.9-d)/.8)); const n=Math.sin(cx*2.3+cz*1.7)*.5+.5; c.copy(gA).lerp(gB,n).lerp(dA.clone().lerp(dB,1-n),dirt).multiplyScalar(.93+.14*(Math.sin(cx*5+cz*3)*.5+.5));
+      for(let k=0;k<3;k++){pos.push(t[k*2],-.012,t[k*2+1]);col.push(c.r,c.g,c.b);}}}}
+  const fg=geo(new THREE.BufferGeometry()); fg.setAttribute("position",new THREE.Float32BufferAttribute(pos,3)); fg.setAttribute("color",new THREE.Float32BufferAttribute(col,3)); fg.computeVertexNormals();
+  scene.add(new THREE.Mesh(fg,mat(new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,flatShading:true}))));
+}
+onDispose(()=>{for(const g of gs)g.dispose();for(const m of ms)m.dispose();for(const t of tx)t.dispose();});

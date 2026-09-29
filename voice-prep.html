@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Shade voice prep</title>
+    <!--
+      Dev-only (served by the Vite dev server, not part of the build input): generates
+      the voice clips of Prometheus' shade with Drawcall. See src/dev/voice-prep.ts.
+    -->
+    <style>
+      :root {
+        --bg: #14100d; --panel: #1e1813; --line: #3a2e24; --text: #f0e3cc; --muted: #b8a58a;
+        --ember: #ff9a45; --ok: #9fcf7a; --missing: #e8744a; --focus: #ffd08a;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+      main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; }
+      h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: .01em; }
+      h1 span { color: var(--ember); }
+      p { margin: 6px 0; color: var(--muted); max-width: 820px; }
+      code { color: var(--text); background: #2a211a; padding: 1px 5px; border-radius: 4px; }
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 18px 0; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      .notice { font-weight: 600; color: var(--text); }
+      .notice.warn { color: var(--missing); }
+      button { font: inherit; color: #1b120b; background: var(--ember); border: 0; border-radius: 7px; padding: 7px 14px; cursor: pointer; font-weight: 600; }
+      button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+      button:disabled { opacity: .45; cursor: default; }
+      button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; vertical-align: top; padding: 8px 8px; border-top: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 600; font-size: 13px; }
+      td.text { max-width: 560px; }
+      td.id { font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: nowrap; }
+      td.id small.batch { color: var(--muted); }
+      td.text small.hint { color: var(--muted); font-size: 12px; }
+      td.on { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); }
+      .status { font-weight: 700; white-space: nowrap; }
+      .status.ok { color: var(--ok); }
+      .status.missing { color: var(--missing); }
+      .status.checking { color: var(--muted); }
+      .table-wrap { overflow-x: auto; }
+      @media (max-width: 720px) { td.on, th.on { display: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Prometheus' shade <span>voice prep</span></h1>
+      <p>
+        Generates every guide line with <code>@drawcall/generate</code>. Each batch below sends its lines to
+        Drawcall: the page moves to Drawcall, you sign in, the clips generate, and you come back here.
+        The game then loads the same URLs (they are content hashes of text, voice and style, kept in
+        <code>src/game/voice-urls.ts</code> by <code>node scripts/voice-urls.mjs</code>), so no files are
+        copied into the project. Subtitle-only hints are never sent for speech.
+      </p>
+      <div class="panel" id="summary"></div>
+      <div class="panel table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Line</th><th class="on">Trigger</th><th>Text</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="lines"></tbody>
+        </table>
+      </div>
+    </main>
+    <script type="module" src="/src/dev/voice-prep.ts"></script>
+  </body>
+</html>

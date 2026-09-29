@@ -1,0 +1,472 @@
+{
+  "reset": {
+    "hiddenGrab": {
+      "entities": [],
+      "total": 0,
+      "limited": false,
+      "_tab": {
+        "id": "tab-mu4e819g-hjxbae",
+        "generation": 1
+      }
+    },
+    "after": {
+      "entities": [],
+      "total": 0,
+      "limited": false,
+      "_tab": {
+        "id": "tab-mu4e819g-hjxbae",
+        "generation": 1
+      }
+    },
+    "spoon": {
+      "entityIndex": 21,
+      "active": true,
+      "name": "Item Spoon",
+      "components": [
+        {
+          "componentId": "Transform",
+          "description": "Component for 3D transformation (position, rotation, scale)",
+          "values": {
+            "position": [
+              2.4200000762939453,
+              1.2000000476837158,
+              -0.4000000059604645
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "parent": {
+              "entityIndex": 11,
+              "name": "LevelRoot"
+            }
+          }
+        }
+      ],
+      "_tab": {
+        "id": "tab-mu4e819g-hjxbae",
+        "generation": 1
+      }
+    },
+    "state": {
+      "entityIndex": 14,
+      "active": true,
+      "name": "Campfire",
+      "components": [
+        {
+          "componentId": "CampState",
+          "values": {
+            "ingredients": 0,
+            "materials": 0,
+            "stir": 0,
+            "strikes": 0,
+            "stewReady": false,
+            "stewEaten": false,
+            "torchCrafted": false,
+            "torchLit": false,
+            "hunger": 65,
+            "revision": 3
+          }
+        }
+      ],
+      "_tab": {
+        "id": "tab-mu4e819g-hjxbae",
+        "generation": 1
+      }
+    }
+  },
+  "movement": {
+    "before": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"entityIndex\": 2,\n  \"active\": true,\n  \"components\": [\n    {\n      \"componentId\": \"Transform\",\n      \"description\": \"Component for 3D transformation (position, rotation, scale)\",\n      \"values\": {\n        \"position\": [\n          0,\n          0.008146985433995724,\n          0.4000000059604645\n        ],\n        \"orientation\": [\n          0,\n          0,\n          0,\n          1\n        ],\n        \"scale\": [\n          1,\n          1,\n          1\n        ],\n        \"parent\": {\n          \"entityIndex\": 0\n        }\n      }\n    }\n  ],\n  \"_tab\": {\n    \"id\": \"tab-mu4e819g-hjxbae\",\n    \"generation\": 1\n  }\n}"
+        }
+      ]
+    },
+    "after": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"entityIndex\": 2,\n  \"active\": true,\n  \"components\": [\n    {\n      \"componentId\": \"Transform\",\n      \"description\": \"Component for 3D transformation (position, rotation, scale)\",\n      \"values\": {\n        \"position\": [\n          -1.1942886114120483,\n          0.010207883082330227,\n          0.4000000059604645\n        ],\n        \"orientation\": [\n          0,\n          0,\n          0,\n          1\n        ],\n        \"scale\": [\n          1,\n          1,\n          1\n        ],\n        \"parent\": {\n          \"entityIndex\": 0\n        }\n      }\n    }\n  ],\n  \"_tab\": {\n    \"id\": \"tab-mu4e819g-hjxbae\",\n    \"generation\": 1\n  }\n}"
+        }
+      ]
+    }
+  },
+  "scene": {
+    "activeFile": "public/scenes/main.iwsdk.scene.json",
+    "composedDocumentHash": "sha256:8defcfc585b7efbefb047e185579b7c314e3c49f479327f5dfffccb751018ce5",
+    "conflict": false,
+    "dependencies": [],
+    "diagnostics": [],
+    "dirty": false,
+    "editor": {
+      "present": true,
+      "ready": true,
+      "commandReady": true,
+      "viewportReady": true,
+      "scenePath": "public/scenes/main.iwsdk.scene.json",
+      "pageId": "tab-mu4e80yw-s1t6x4:editor",
+      "sceneSessionId": "scene-x4f9o37du6",
+      "dirty": false,
+      "fileStatus": "ready",
+      "lastReloadedAt": "2026-09-16T17:47:14.366Z"
+    },
+    "renderStats": {
+      "available": true,
+      "calls": 152,
+      "frameTimeSamplesMs": [
+        6.4,
+        91.3,
+        1.7,
+        1.6,
+        1.1,
+        0.6,
+        1.4,
+        0.9
+      ],
+      "lines": 120,
+      "environment": {
+        "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "devicePixelRatio": 1,
+        "emulatedUserAgent": "Mozilla/5.0 (X11; Linux x86_64; Quest 3) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/33.0.0.x.x.x Chrome/126.0.6478.122 VR Safari/537.36",
+        "emulationProfile": {
+          "active": true,
+          "device": "metaQuest3",
+          "runtime": "IWER"
+        },
+        "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "hostPlatform": "macOS",
+        "hostUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "renderer": "IWSDK WebGL",
+        "visibility": {
+          "method": "threejs-first-hit-sampling-v1",
+          "occlusion": "conservative-cpu-first-hit",
+          "sampleGrid": "3x3-projected-bounds+overhead-lower-frame",
+          "uncertainObjectsIncluded": false
+        }
+      },
+      "geometryCount": 103,
+      "points": 0,
+      "programs": 21,
+      "materialCount": 84,
+      "meshCount": 174,
+      "nodeCount": 56,
+      "objectCount": 277,
+      "shadowCasters": 0,
+      "sceneAssets": [
+        {
+          "id": "walkable-ground",
+          "meshCount": 1
+        },
+        {
+          "id": "woodland",
+          "meshCount": 19
+        },
+        {
+          "id": "campfire",
+          "meshCount": 27
+        },
+        {
+          "id": "bench",
+          "meshCount": 8
+        },
+        {
+          "id": "striking-pad",
+          "meshCount": 1
+        },
+        {
+          "id": "supply-stand",
+          "meshCount": 5
+        },
+        {
+          "id": "backpack",
+          "meshCount": 11
+        },
+        {
+          "id": "meat",
+          "meshCount": 2
+        },
+        {
+          "id": "mushroom",
+          "meshCount": 2
+        },
+        {
+          "id": "spoon",
+          "meshCount": 3
+        },
+        {
+          "id": "stick",
+          "meshCount": 3
+        },
+        {
+          "id": "cloth",
+          "meshCount": 2
+        },
+        {
+          "id": "resin",
+          "meshCount": 2
+        },
+        {
+          "id": "hammer",
+          "meshCount": 4
+        },
+        {
+          "id": "torch",
+          "meshCount": 6
+        },
+        {
+          "id": "stew-bowl",
+          "meshCount": 5
+        },
+        {
+          "id": "camp-journal",
+          "meshCount": 1
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-2",
+          "meshCount": 2
+        },
+        {
+          "id": "pine-1",
+          "meshCount": 2
+        }
+      ],
+      "textures": 16,
+      "triangles": 140763,
+      "visibleNodeIds": [
+        "ambient-fill",
+        "camp-journal",
+        "campfire",
+        "crafting-bench",
+        "ground",
+        "item-cloth",
+        "item-hammer",
+        "item-meat",
+        "item-mushroom",
+        "item-stew",
+        "item-stick",
+        "item-torch",
+        "striking-pad",
+        "sun",
+        "supply-backpack",
+        "supply-stand",
+        "woodland",
+        "woodland-pine-1",
+        "woodland-pine-22",
+        "woodland-pine-23",
+        "woodland-pine-3",
+        "woodland-pine-7"
+      ],
+      "framingBounds": {
+        "max": [
+          46.822,
+          17.6543,
+          4.1492
+        ],
+        "min": [
+          -61.2522,
+          -2,
+          -85.074
+        ],
+        "size": [
+          108.0742,
+          19.6543,
+          89.2232
+        ]
+      },
+      "worldBounds": {
+        "max": [
+          46.822,
+          22.2146,
+          11
+        ],
+        "min": [
+          -61.2522,
+          -2,
+          -85.074
+        ],
+        "size": [
+          108.0742,
+          24.2146,
+          96.074
+        ]
+      }
+    },
+    "runtime": {
+      "present": true,
+      "ready": true,
+      "readinessReason": null,
+      "stale": false,
+      "pageId": "tab-mu4e80yw-s1t6x4:runtime",
+      "error": null,
+      "expectedRuntimeHash": "sha256:f997a9c0cb107816c5108328801c803af642ee2ec3febdab3bfd6d8bb9123d37",
+      "frameConnected": true
+    },
+    "runtimeHash": "sha256:f997a9c0cb107816c5108328801c803af642ee2ec3febdab3bfd6d8bb9123d37",
+    "selection": {
+      "nodeIds": [],
+      "builtInTarget": "level-root",
+      "rootSelected": true
+    },
+    "sourceDocumentHash": "sha256:8defcfc585b7efbefb047e185579b7c314e3c49f479327f5dfffccb751018ce5",
+    "validation": {
+      "valid": true,
+      "issues": [],
+      "lifecycle": {
+        "schemaValid": "passed",
+        "capabilityCompatible": "passed",
+        "resourcesReady": "not-run",
+        "editorCommitted": "not-run",
+        "runtimeProven": "not-run"
+      }
+    },
+    "_tab": {
+      "id": "tab-mu4e80yw-s1t6x4",
+      "generation": 1
+    }
+  }
+}

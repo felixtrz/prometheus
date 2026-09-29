@@ -1,0 +1,152 @@
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+import { isPreview, loadingManager, onDispose, onFrame, scene } from "@drawcall/glts";
+
+const root = new THREE.Group(); scene.add(root);
+const gs: THREE.BufferGeometry[] = []; const ms: THREE.Material[] = []; const tx: THREE.Texture[] = [];
+const geo = <T extends THREE.BufferGeometry>(g:T)=>(gs.push(g),g); const mat=<T extends THREE.Material>(m:T)=>(ms.push(m),m);
+
+const loader = new THREE.TextureLoader(loadingManager);
+async function tiled(path:string, rx:number, ry:number, srgb=false){
+  const t = await loader.loadAsync(new URL(path, import.meta.url).href);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=2; if(srgb) t.colorSpace=THREE.SRGBColorSpace; tx.push(t); return t;
+}
+const barkMap = await tiled("/k3jb7rbhm5qoxi/public/bark-04_baseColor.png", 1.2, 1.8, true);
+const barkRough = await tiled("/k3jb7rbhm5qoxi/public/bark-04_roughness.png", 1.2, 1.8);
+const barkNormal = await tiled("/k3jb7rbhm5qoxi/public/bark-04_normal.png", 1.2, 1.8);
+
+const bark = mat(new THREE.MeshStandardMaterial({ color:0x95623f, map:barkMap, roughnessMap:barkRough, roughness:.94, flatShading:true }));
+const barkDark = mat(new THREE.MeshStandardMaterial({ color:0x6a4631, map:barkMap, roughnessMap:barkRough, roughness:.97, flatShading:true }));
+const cutWood = mat(new THREE.MeshStandardMaterial({ color:0xb27c50, roughness:.92 }));
+const cutDark = mat(new THREE.MeshStandardMaterial({ color:0x7b5439, roughness:.96 }));
+const charred = mat(new THREE.MeshStandardMaterial({ color:0x2a2320, roughness:1 }));
+const rope = mat(new THREE.MeshStandardMaterial({ color:0xb0935b, roughness:1 }));
+const iron = mat(new THREE.MeshStandardMaterial({ color:0x30363a, roughness:.72, metalness:.14, flatShading:true }));
+const ironEdge = mat(new THREE.MeshStandardMaterial({ color:0x525a5f, roughness:.60, metalness:.18, flatShading:true }));
+const soot = mat(new THREE.MeshStandardMaterial({ color:0x202326, roughness:.98 }));
+const stew = mat(new THREE.MeshStandardMaterial({ color:0x5b2e1d, roughness:.55 }));
+const stewBitA = mat(new THREE.MeshStandardMaterial({color:0xb3652d,roughness:.76}));
+const stewBitB = mat(new THREE.MeshStandardMaterial({color:0xc99b57,roughness:.82}));
+const ember = mat(new THREE.MeshBasicMaterial({ color:0xff6b1e }));
+const emberDim = mat(new THREE.MeshBasicMaterial({ color:0xb8401a }));
+const ash = mat(new THREE.MeshStandardMaterial({ color:0x8c8580, roughness:1 }));
+const coal = mat(new THREE.MeshStandardMaterial({ color:0x332821, roughness:1 }));
+const flameA = mat(new THREE.MeshBasicMaterial({ color:0xff8a22, transparent:true, opacity:.90, depthWrite:false, side:THREE.DoubleSide }));
+const flameB = mat(new THREE.MeshBasicMaterial({ color:0xffd75a, transparent:true, opacity:.95, depthWrite:false, side:THREE.DoubleSide }));
+const flameC = mat(new THREE.MeshBasicMaterial({ color:0xfff2b0, transparent:true, opacity:.98, depthWrite:false, side:THREE.DoubleSide }));
+const stoneMats = [0x6d706b,0x7b7d76,0x5f645f,0x858278].map(c=>mat(new THREE.MeshStandardMaterial({color:c,roughness:.99,flatShading:true})));
+const stoneSoot = mat(new THREE.MeshStandardMaterial({color:0x4a4a47,roughness:1,flatShading:true}));
+const shadow = mat(new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.13,depthWrite:false}));
+
+function cyl(rt:number,rb:number,h:number,seg:number,pos:[number,number,number],m:THREE.Material,parent=root){const mesh=new THREE.Mesh(geo(new THREE.CylinderGeometry(rt,rb,h,seg)),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
+function chamfer(size:[number,number,number],_r:number,pos:[number,number,number],m:THREE.Material,parent=root){const mesh=new THREE.Mesh(geo(new THREE.BoxGeometry(size[0],size[1],size[2])),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
+function cylinderBetween(a:THREE.Vector3,b:THREE.Vector3,r:number,m:THREE.Material,segments=7){const mesh=new THREE.Mesh(geo(new THREE.CylinderGeometry(r,r,a.distanceTo(b),segments)),m);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());root.add(mesh);return mesh;}
+
+// Fire ring: irregular stones, inner faces sooted, so the ring reads as used.
+for(let i=0;i<12;i++){
+  const a=i/12*Math.PI*2; const g=geo(new THREE.IcosahedronGeometry(.17,1));
+  const p=g.attributes.position as THREE.BufferAttribute;
+  for(let v=0;v<p.count;v++){
+    const vx=p.getX(v), vy=p.getY(v), vz=p.getZ(v);
+    const seed=Math.sin((v+1)*12.9898 + i*5.31)*43758.5453; const n=(seed-Math.floor(seed)-.5)*.10;
+    const s=1+n; p.setXYZ(v,vx*s,vy*(1+n*.55),vz*s);
+  }
+  g.computeVertexNormals();
+  const stone=new THREE.Mesh(g,i%4===1?stoneSoot:stoneMats[i%stoneMats.length]);
+  const r=.59+(i%2)*.018; stone.position.set(Math.cos(a)*r,.13,Math.sin(a)*r); stone.scale.set(1.08+(i%3)*.05,.72+(i%4)*.035,.92+(i%2)*.06); stone.rotation.set(.06*(i%2),a*.35,.04*(i%3)); root.add(stone);
+}
+
+// Ash bed and ember core under the logs.
+cyl(.50,.54,.03,10,[0,.08,0],ash);
+cyl(.37,.42,.052,10,[0,.115,0],ember);
+cyl(.44,.46,.012,10,[0,.10,0],emberDim);
+for(let i=0;i<10;i++){const a=i/10*Math.PI*2;const cg=geo(new THREE.DodecahedronGeometry(.055+(i%3)*.009,0));const c=new THREE.Mesh(cg,coal);c.position.set(Math.cos(a)*(.20+(i%2)*.035),.17,Math.sin(a)*(.20+(i%2)*.035));c.scale.y=.58;root.add(c);}
+
+// Two crossed logs with cut ends, growth rings and a charred underside band.
+for(const [rotY,z] of [[Math.PI/4,.025],[-Math.PI/4,-.025]] as [number,number][]){
+  const log=new THREE.Mesh(geo(new THREE.CylinderGeometry(.105,.125,1.0,8)),bark); log.rotation.z=Math.PI/2; log.rotation.y=rotY; log.position.set(0,.23,z); root.add(log);
+  const char=new THREE.Mesh(geo(new THREE.CylinderGeometry(.108,.128,.42,8,1,true,Math.PI*.55,Math.PI*.9)),charred); char.rotation.copy(log.rotation); char.position.copy(log.position); root.add(char);
+  for(const sign of [-1,1]){
+    const local=new THREE.Vector3(sign*.493,0,0).applyEuler(log.rotation).add(log.position);
+    const end=cyl(.087,.087,.014,8,[local.x,local.y,local.z],cutWood); end.rotation.copy(log.rotation);
+    for(const rr of [.025,.048,.070]){const ring=new THREE.Mesh(geo(new THREE.TorusGeometry(rr,.0035,4,8)),cutDark);ring.rotation.y=Math.PI/2;ring.rotation.z=rotY;ring.position.copy(local);root.add(ring);}
+  }
+  const knot=cyl(.018,.026,.09,10,[.12,.34,z],barkDark); knot.rotation.z=.55; knot.rotation.y=rotY;
+}
+// A third, smaller split log leaning in gives the fire an authored, asymmetric build.
+{
+  const split=new THREE.Mesh(geo(new THREE.CylinderGeometry(.07,.08,.62,10,1,false,0,Math.PI)),barkDark);
+  split.rotation.set(0,1.1,Math.PI/2+.45); split.position.set(.10,.30,.18); root.add(split);
+  const splitBark=new THREE.Mesh(geo(new THREE.CylinderGeometry(.07,.08,.62,10,1,true,Math.PI,Math.PI)),cutWood);
+  splitBark.rotation.copy(split.rotation); splitBark.position.copy(split.position); root.add(splitBark);
+}
+
+// Flames: three lathe tongues, gently animated so the asset feels alive without particles.
+const flames:THREE.Mesh[]=[];
+function flame(profileScale:number,x:number,z:number,h:number,m:THREE.Material,rot=0){
+  const pts=[new THREE.Vector2(.11*profileScale,0),new THREE.Vector2(.18*profileScale,.10*h),new THREE.Vector2(.14*profileScale,.35*h),new THREE.Vector2(.07*profileScale,.68*h),new THREE.Vector2(.018*profileScale,.95*h),new THREE.Vector2(0,h)];
+  const f=new THREE.Mesh(geo(new THREE.LatheGeometry(pts,7)),m);f.position.set(x,.20,z);f.rotation.y=rot;root.add(f);flames.push(f);return f;
+}
+flame(1.05,0,0,.58,flameA); flame(.78,-.10,.035,.50,flameB,.3); flame(.74,.11,-.03,.45,flameA,-.4); flame(.55,-.02,.01,.36,flameC,.9);
+// A single cheap, non-shadow-casting point light gives the fire real local glow without post-processing.
+const fireGlow = new THREE.PointLight(0xff8a43, 2.8, 1.85, 2);
+fireGlow.position.set(0, .58, .02);
+fireGlow.castShadow = false;
+root.add(fireGlow);
+let t=0;
+onFrame((dt)=>{ t+=dt; for(let i=0;i<flames.length;i++){ const f=flames[i]; const w=1+.07*Math.sin(t*9+i*1.7)+.04*Math.sin(t*15.3+i*.9); f.scale.set(1+.05*Math.sin(t*11+i),w,1+.05*Math.cos(t*10+i*2)); f.rotation.z=.06*Math.sin(t*6+i); } fireGlow.intensity=2.8+.35*Math.sin(t*13)+.2*Math.sin(t*7.3); });
+
+// Tripod of debarked poles, lashed at the apex, feet outside the ring.
+const apex=new THREE.Vector3(0,1.90,0);
+const footRadius=1.06;
+const tripodOffset=-0.35;
+for(const [baseA,side] of [[-Math.PI/2,-1],[Math.PI/6,1],[Math.PI*5/6,1]] as [number,number][]){
+  const a=baseA+tripodOffset;
+  const foot=new THREE.Vector3(Math.cos(a)*footRadius,.03,Math.sin(a)*footRadius);
+  cylinderBetween(foot,apex,.037,barkDark,14);
+  const mid=foot.clone().lerp(apex,.43); const peg=cyl(.018,.024,.12,10,[mid.x,mid.y,mid.z],bark); peg.rotation.z=.65*side; peg.rotation.y=-a;
+  // stubby cut branch nubs make each pole a real found stick rather than a dowel
+  const nub=foot.clone().lerp(apex,.68); const n=cyl(.012,.018,.07,8,[nub.x,nub.y,nub.z],bark); n.rotation.z=-.9*side; n.rotation.y=a*.5;
+}
+for(let i=0;i<5;i++){const lash=new THREE.Mesh(geo(new THREE.TorusGeometry(.098+i*.004,.010,6,20)),rope);lash.rotation.x=Math.PI/2;lash.position.set(0,1.79-i*.017,0);root.add(lash);}
+for(const rz of [-.55,.55]){const tie=cyl(.009,.009,.24,8,[0,1.76,0],rope);tie.rotation.z=rz;}
+
+// Iron chain from the lashing down to an S-hook that carries the bail.
+for(let i=0;i<6;i++){
+  const link=new THREE.Mesh(geo(new THREE.TorusGeometry(.024,.006,6,14)),ironEdge);
+  link.scale.y=1.35; link.rotation.y=i%2?Math.PI/2:0; link.position.set(0,1.75-i*.042,0); root.add(link);
+}
+const hook=new THREE.Mesh(geo(new THREE.TorusGeometry(.052,.010,6,18,Math.PI*1.45)),ironEdge);hook.rotation.z=Math.PI*.78;hook.position.set(0,1.505,0);root.add(hook);
+
+// Cast-iron pot with soot band, riveted lugs and an upward bail hanging from the hook.
+const profile=[new THREE.Vector2(.245,-.18),new THREE.Vector2(.29,-.17),new THREE.Vector2(.34,-.10),new THREE.Vector2(.355,.04),new THREE.Vector2(.345,.14),new THREE.Vector2(.325,.18)];
+const potBody=new THREE.Mesh(geo(new THREE.LatheGeometry(profile,10)),iron);potBody.position.y=.99;root.add(potBody);
+const sootBand=new THREE.Mesh(geo(new THREE.TorusGeometry(.285,.022,5,10)),soot);sootBand.rotation.x=Math.PI/2;sootBand.position.y=.84;root.add(sootBand);
+const rim=new THREE.Mesh(geo(new THREE.TorusGeometry(.335,.022,5,10)),ironEdge);rim.rotation.x=Math.PI/2;rim.position.y=1.17;root.add(rim);
+cyl(.305,.305,.012,10,[0,1.158,0],soot);
+cyl(.275,.275,.008,10,[0,1.166,0],stew);
+for(let i=0;i<5;i++){const bit=new THREE.Mesh(geo(new THREE.SphereGeometry(.025+(i%2)*.008,10,7)),i%2?stewBitB:stewBitA);bit.position.set((i-2)*.055,1.182,(i%3-1)*.035);root.add(bit);}
+for(const x of [-.345,.345]){
+  chamfer([.07,.085,.085],.010,[x,1.11,0],ironEdge);
+  for(const dz of [-.025,.025]) cyl(.011,.011,.012,8,[x+(x<0?-.036:.036),1.11,dz],iron).rotation.z=Math.PI/2;
+}
+const bail=new THREE.Mesh(geo(new THREE.TorusGeometry(.345,.015,8,36,Math.PI)),ironEdge);bail.position.y=1.12;root.add(bail);
+// wooden grip on the bail top so a VR hand has an obvious place to grab
+const grip=cyl(.024,.024,.16,10,[0,1.465,0],cutDark);grip.rotation.z=Math.PI/2;
+
+scene.defaultCamera=new THREE.PerspectiveCamera(36,1,.1,100);scene.defaultCamera.position.set(2.85,2.05,3.20);scene.defaultCamera.lookAt(0,.86,0);
+if(isPreview){
+  scene.background=new THREE.Color(0xc9d3bd);
+  const hemi=new THREE.HemisphereLight(0xe8f1df,0x68704f,1.0);const key=new THREE.DirectionalLight(0xffefd4,1.6);key.position.set(3.2,5.2,4.1);scene.add(hemi,key);
+  // low-poly preview ground: jittered fan disc with per-face colour, dirt fading to grass
+  const seg=26, rings=7; const pos:number[]=[], col:number[]=[]; const gA=new THREE.Color(0x7fb038), gB=new THREE.Color(0x9dcb46), dA=new THREE.Color(0xb98d57), dB=new THREE.Color(0x9a6f42); const c=new THREE.Color();
+  const pt=(r:number,a:number)=>{const j=Math.sin(r*7.1+a*13.3)*.5+.5;return [Math.cos(a)*(r+(j-.5)*.18), Math.sin(a)*(r+(j-.5)*.18)];};
+  for(let ri=0;ri<rings;ri++){const r0=ri*4.5/rings, r1=(ri+1)*4.5/rings; for(let s=0;s<seg;s++){const a0=s/seg*Math.PI*2,a1=(s+1)/seg*Math.PI*2; const [x0,z0]=pt(r0,a0),[x1,z1]=pt(r0,a1),[x2,z2]=pt(r1,a0),[x3,z3]=pt(r1,a1);
+    const tris=r0===0?[[0,0,x3,z3,x2,z2]]:[[x0,z0,x3,z3,x2,z2],[x0,z0,x1,z1,x3,z3]];
+    for(const t of tris){const cx=(t[0]+t[2]+t[4])/3,cz=(t[1]+t[3]+t[5])/3; const d=Math.hypot(cx,cz); const dirt=Math.max(0,Math.min(1,(2.2-d)/.9)); const n=Math.sin(cx*2.3+cz*1.7)*.5+.5; c.copy(gA).lerp(gB,n).lerp(dA.clone().lerp(dB,1-n),dirt).multiplyScalar(.93+.14*(Math.sin(cx*5+cz*3)*.5+.5));
+      for(let k=0;k<3;k++){pos.push(t[k*2],-.01,t[k*2+1]);col.push(c.r,c.g,c.b);}}}}
+  const fg=geo(new THREE.BufferGeometry()); fg.setAttribute("position",new THREE.Float32BufferAttribute(pos,3)); fg.setAttribute("color",new THREE.Float32BufferAttribute(col,3)); fg.computeVertexNormals();
+  scene.add(new THREE.Mesh(fg,mat(new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,flatShading:true}))));
+}
+onDispose(()=>{for(const g of gs)g.dispose();for(const m of ms)m.dispose();for(const t of tx)t.dispose();});

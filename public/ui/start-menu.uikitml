@@ -1,0 +1,185 @@
+<!--
+  Start panel: the game's name, the story hook, New journey / Continue.
+  Code-spawned by src/game/systems/start-system.ts in front of the player's view
+  (desktop mouse or XR ray + trigger). Continue is hidden unless a save exists.
+  Bundled MSDF fonts are ASCII + Latin-1 only: the em dash in the title is drawn
+  as a rule (sm-dash) and runtime text is sanitised.
+  Natural size 80 x ~70 units (cm). Classes are prefixed "sm-".
+-->
+<style>
+  .sm-root {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 80;
+    padding-top: 5.5;
+    padding-bottom: 4.5;
+    padding-left: 6.5;
+    padding-right: 6.5;
+    gap: 2.2;
+    font-family: inter;
+    font-weight: 500;
+    font-size: 2.6;
+    line-height: 1.4;
+    color: #ede9da;
+    background-color: #131c18;
+    border-color: #9a6b3c;
+    border-width: 0.3;
+    border-radius: 2.6;
+  }
+  .sm-crest {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8;
+    height: 8;
+    border-radius: 4;
+    background-color: #2a1d12;
+    border-color: #9a6b3c;
+    border-width: 0.25;
+  }
+  .sm-flame {
+    width: 4.6;
+    height: 4.6;
+    color: #f0a052;
+  }
+  .sm-title-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2.2;
+  }
+  .sm-title {
+    font-family: crimson-text;
+    font-size: 6.6;
+    font-weight: 700;
+    line-height: 1.05;
+    color: #ede9da;
+  }
+  .sm-title-gold {
+    color: #e2b57a;
+  }
+  .sm-dash {
+    width: 4.2;
+    height: 0.45;
+    margin-top: 0.8;
+    border-radius: 0.2;
+    background-color: #b08250;
+  }
+  .sm-rule {
+    width: 30;
+    height: 0.2;
+    background-color: #4a4336;
+    margin-top: 0.6;
+    margin-bottom: 0.6;
+  }
+  .sm-lead {
+    width: 100%;
+    font-family: crimson-text;
+    font-size: 3.7;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+    color: #ead9b8;
+  }
+  .sm-hook {
+    width: 100%;
+    font-size: 2.6;
+    line-height: 1.5;
+    text-align: center;
+    color: #b9c4b6;
+  }
+  .sm-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1.8;
+    width: 100%;
+    margin-top: 1.6;
+  }
+  .sm-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 11.5;
+    gap: 0.3;
+    border-radius: 1.4;
+    border-width: 0.3;
+    border-color: #b78d59;
+    background-color: #d9ae70;
+    color: #17231e;
+    cursor: pointer;
+  }
+  .sm-btn:hover { background-color: #e8c48f; }
+  .sm-btn-quiet {
+    background-color: #1b2621;
+    border-color: #667567;
+    color: #dfe6d8;
+  }
+  .sm-btn-quiet:hover { background-color: #2a3a31; }
+  .sm-btn-label {
+    font-size: 3.4;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  .sm-btn-sub {
+    font-size: 2.2;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  .sm-foot {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 0.6;
+  }
+  .sm-help {
+    font-size: 2.1;
+    color: #8f9d90;
+  }
+  .sm-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 5;
+    padding-left: 2.2;
+    padding-right: 2.2;
+    border-radius: 1;
+    border-width: 0.25;
+    border-color: #667567;
+    background-color: #1b2621;
+    color: #dfe6d8;
+    font-size: 2.2;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .sm-link:hover { background-color: #2a3a31; }
+</style>
+<div id="sm-root" class="sm-root">
+  <div class="sm-crest"><Flame class="sm-flame"></Flame></div>
+  <div class="sm-title-row">
+    <span id="sm-name" class="sm-title">Prometheus</span>
+    <div class="sm-dash"></div>
+    <span id="sm-subtitle" class="sm-title sm-title-gold">First Fire</span>
+  </div>
+  <div class="sm-rule"></div>
+  <span id="sm-lead" class="sm-lead">The night the expedition took the Spire's flame, every fire in the valley went out. All but one.</span>
+  <span id="sm-hook" class="sm-hook">You wake beside a cold fire. You don't remember lying down. There's a note in your pack, in your handwriting.</span>
+  <div class="sm-actions">
+    <button id="sm-continue" class="sm-btn" style="display: none">
+      <span class="sm-btn-label">Continue</span>
+      <span id="sm-continue-sub" class="sm-btn-sub">Day 1 - 0 of 10 objectives - 0 of 7 pages</span>
+    </button>
+    <button id="sm-new" class="sm-btn">
+      <span id="sm-new-label" class="sm-btn-label">New journey</span>
+      <span id="sm-new-sub" class="sm-btn-sub">Wake beside the cold fire</span>
+    </button>
+  </div>
+  <div class="sm-foot">
+    <span id="sm-help" class="sm-help">Click to choose.</span>
+    <button id="sm-enter-xr" class="sm-link" style="display: none">Enter VR</button>
+  </div>
+</div>

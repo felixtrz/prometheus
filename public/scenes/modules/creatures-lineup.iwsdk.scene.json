@@ -1,0 +1,26 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.DomeGradient": { "sky": [0.1, 0.36, 0.68, 1], "equator": [0.62, 0.8, 0.87, 1], "ground": [0.32, 0.38, 0.2, 1], "intensity": 1 },
+    "com.iwsdk.components.IBLGradient": { "sky": [0.53, 0.68, 0.81, 1], "equator": [0.72, 0.77, 0.65, 1], "ground": [0.28, 0.34, 0.17, 1], "intensity": 0.8 }
+  },
+  "player": { "transform": { "position": [0, 0, 4] } },
+  "resources": {},
+  "authoring": {
+    "views": [
+      { "id": "lineup", "role": "hero", "projection": "perspective", "position": [0.35, 0.95, 3.2], "target": [0.35, 0.55, 0], "fov": 42 },
+      { "id": "lineup-side", "role": "diagnostic", "projection": "perspective", "position": [3.4, 0.8, 0.3], "target": [0.35, 0.55, 0], "fov": 42 },
+      { "id": "lineup-front", "role": "diagnostic", "projection": "perspective", "position": [0.35, 0.9, 3.4], "target": [0.35, 0.6, 0], "fov": 40 },
+      { "id": "wolf-close", "role": "diagnostic", "projection": "perspective", "position": [2.35, 0.95, 1.45], "target": [1.35, 0.55, 0], "fov": 40 }
+    ]
+  },
+  "nodes": [
+    { "id": "ground", "name": "Ground", "content": { "type": "asset", "asset": "walkable-ground" }, "transform": { "position": [0, 0, 0] }, "components": {}, "framingRole": "support" },
+    { "id": "deer", "name": "Deer", "content": { "type": "asset", "asset": "deer" }, "transform": { "position": [-0.9, 0, 0], "rotationDeg": [0, 60, 0] }, "components": {} },
+    { "id": "rabbit", "name": "Rabbit", "content": { "type": "asset", "asset": "rabbit" }, "transform": { "position": [0.3, 0, 0.5], "rotationDeg": [0, 50, 0] }, "components": {} },
+    { "id": "wolf", "name": "Hollow ash-wolf", "content": { "type": "asset", "asset": "wolf" }, "transform": { "position": [1.35, 0, 0], "rotationDeg": [0, -60, 0] }, "components": {} },
+    { "id": "sun", "content": { "type": "group" }, "transform": { "position": [-7, 22, 9], "rotationDeg": [-58, -30, 0] }, "components": { "DirectionalLight": { "color": [1, 0.89, 0.72, 1], "intensity": 1.7 } } },
+    { "id": "ambient-fill", "content": { "type": "group" }, "components": { "HemisphereLight": { "skyColor": [0.69, 0.82, 1, 1], "groundColor": [0.33, 0.4, 0.18, 1], "intensity": 0.3 } } }
+  ]
+}

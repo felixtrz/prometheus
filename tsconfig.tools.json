@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "allowImportingTsExtensions": true,
+    "types": ["@iwsdk/vite-plugin-dev/client", "node"],
+    "paths": {
+      "/src/*": ["./src/*"],
+      "/vitexec/*": ["./vitexec/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "vitexec/**/*.ts", "vite.config.ts", "tests/vitexec.config.ts"]
+}

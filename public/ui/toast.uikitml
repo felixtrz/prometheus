@@ -1,0 +1,76 @@
+<!--
+  World-space notice (pooled x3 by src/game/systems/toast-system.ts). Display only:
+  pointer events off. ToastSystem turns off depth testing at runtime so
+  trees never swallow it (depth-test cannot be written as a CSS value).
+  Natural size 60 x ~12 units; the system scales it (0.8 -> 48 cm wide at 1.4 m).
+  Classes are prefixed "ts-" (UIKit classes share one global stylesheet).
+-->
+<style>
+  .ts-root {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 60;
+    gap: 2.6;
+    padding-top: 2.4;
+    padding-bottom: 2.4;
+    padding-left: 2.6;
+    padding-right: 3.4;
+    font-family: inter;
+    font-weight: 500;
+    font-size: 2.6;
+    line-height: 1.35;
+    color: #ede9da;
+    background-color: #192520;
+    border-color: #d4b180;
+    border-width: 0.35;
+    border-radius: 1.8;
+    pointer-events: none;
+  }
+  .ts-badge {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 6.4;
+    height: 6.4;
+    border-radius: 3.2;
+    background-color: #2b3c32;
+  }
+  .ts-icon {
+    width: 3.8;
+    height: 3.8;
+  }
+  .ts-good { color: #b9cf8f; }
+  .ts-info { color: #d4b180; }
+  .ts-warn { color: #e58a55; }
+  .ts-text {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    gap: 0.4;
+  }
+  .ts-title {
+    font-size: 3.1;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #ede9da;
+  }
+  .ts-body {
+    font-size: 2.9;
+    line-height: 1.4;
+    color: #c3cdbf;
+  }
+</style>
+<div id="ts-root" class="ts-root">
+  <div class="ts-badge">
+    <Check id="ts-ic-good" class="ts-icon ts-good"></Check>
+    <BookOpen id="ts-ic-info" class="ts-icon ts-info" style="display: none"></BookOpen>
+    <TriangleAlert id="ts-ic-warn" class="ts-icon ts-warn" style="display: none"></TriangleAlert>
+  </div>
+  <div class="ts-text">
+    <span id="ts-title" class="ts-title">Recipe learned: Torch</span>
+    <span id="ts-body" class="ts-body">stick + cloth + resin</span>
+  </div>
+</div>
