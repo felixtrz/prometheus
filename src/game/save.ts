@@ -6,7 +6,8 @@
  * (StartSystem → StorySystem.applySave). A new journey clears it before the world is
  * reset, and nothing autosaves until the chosen journey has begun.
  */
-import { OBJECTIVES, PAGES } from './story.js';
+import { JOURNEY_MASK, objectiveIndex, OBJECTIVES, PAGES } from './story.js';
+import { validSavedTree, type SavedTree } from './forest.js';
 
 export const SAVE_KEY = 'prometheus.save.v1';
 
@@ -29,6 +30,12 @@ export type SaveData = {
     slain?: number;
   };
   fire: { fuel: number; lit: boolean; potA: string; potB: string; stir: number; stew: string };
+  /**
+   * The backpack: 'worn' (owned, on the back), 'unowned' (not found yet) or 'dropped' (lost
+   * at death), with where an unowned or dropped pack lies. Older saves say 'unrolled' (the old
+   * mat). What it holds is in `items` (slots 'pack-N'; a stack is several items in one slot),
+   * as are the hip holsters ('hip-left' / 'hip-right').
+   */
   pack: { state: string; p: [number, number, number]; yaw: number; lost: boolean } | null;
   items: SavedItem[];
   /** Scene-authored item uids that were consumed (eaten, burned, crafted away). */
@@ -36,6 +43,8 @@ export type SaveData = {
   nodes: { id: string; available: boolean; hits: number }[];
   beacons: { id: string; lit: boolean }[];
   sentries: { uid: string; bolts: number }[];
+  /** Felled trees still regrowing (ForestSystem). Absent in older saves: every tree stands. */
+  trees?: SavedTree[];
 };
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -85,6 +94,10 @@ export function parseSave(raw: string | null | undefined): SaveData | null {
   g.deaths = g.deaths ?? 0;
   g.crafted = g.crafted ?? 0;
   g.slain = g.slain ?? 0;
+  // Saves from before the wreck opening began at camp: any progress there means the journey
+  // (escape, waystation, forest: JOURNEY_MASK) is behind that keeper. New saves always hold
+  // 'escape' before any camp objective, so they are never touched.
+  if ((g.objectives & ~JOURNEY_MASK) !== 0 && (g.objectives & (1 << objectiveIndex('escape'))) === 0) g.objectives |= JOURNEY_MASK;
   const f = data.fire as SaveData['fire'] | undefined;
   if (!isObject(f) || !isNumber(f.fuel) || !isBoolean(f.lit) || !isString(f.potA) || !isString(f.potB) ||
     !isNumber(f.stir) || !isString(f.stew)) return null;
@@ -93,6 +106,8 @@ export function parseSave(raw: string | null | undefined): SaveData | null {
   if (!isArray(data.items) || !isArray(data.consumed) || !isArray(data.nodes) || !isArray(data.beacons) || !isArray(data.sentries)) return null;
   if (!data.items.every(validItem) || !data.consumed.every(isString) || !data.nodes.every(validNode) ||
     !data.beacons.every(validBeacon) || !data.sentries.every(validSentry)) return null;
+  // Felled trees are scenery state: a malformed list only regrows the forest, never loses the journey.
+  if (data.trees !== undefined && !(isArray(data.trees) && data.trees.every(validSavedTree))) delete data.trees;
   return data;
 }
 

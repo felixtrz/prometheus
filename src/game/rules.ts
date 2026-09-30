@@ -186,7 +186,7 @@ export const DAWN_CLOCK = DAY.day + DAY.dusk + DAY.night;
 export const ingredientBit = (kind: string): number =>
   kind === 'meat' ? 1 : kind === 'mushroom' ? 2 : 0;
 export const materialSlot = (kind: string): number =>
-  kind === 'stick' ? 0 : kind === 'cloth' ? 1 : kind === 'resin' ? 2 : -1;
+  kind === 'stick' ? 0 : kind === 'reeds' ? 1 : kind === 'resin' ? 2 : -1;
 
 export function inPot(x: number, y: number, z: number): boolean {
   return Math.hypot(x - CAMP.pot.x, z - CAMP.pot.z) < 0.29 &&

@@ -5,8 +5,9 @@ at night and carry fire to the Spire, guided by Prometheus' shade. Built with IW
 0.5.3, from the Drawcall **VR Survival Crafting — Visual Moodboard** GDD (original
 design snapshots in `design/source/`).
 
-**Start with [HANDOFF.md](HANDOFF.md)**: status, how to run and test (vitexec), where
-things are, and next steps.
+Gameplay checks run inside the one managed browser: `npm run check` (every scenario),
+`npm run check -- expedition` (one), `npm run check -- expedition@bolts` (resume at a
+section from the last full run's checkpoint). Design docs are in `design/`.
 
 ```sh
 npm install

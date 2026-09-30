@@ -1,13 +1,23 @@
 import { ITEMS } from './catalog.js';
 
-/** Bench recipes. Bit index = position in this list (GameState.recipes). */
+/**
+ * Bench recipes, three parts each (the bench has three bays). Bit index = position in
+ * this list (GameState.recipes): the five products pages teach keep their original bits
+ * (saves predate the parts), and the parts (`part: true`) follow. Parts are known from
+ * the start: nothing finished lies in the valley, every part is made from gathered stuff.
+ */
 export const BENCH_RECIPES = [
-  { product: 'torch', inputs: ['stick', 'cloth', 'resin'], yields: 1, label: 'Torch' },
-  { product: 'spear', inputs: ['stick', 'flint', 'cord'], yields: 1, label: 'Spear' },
-  { product: 'bolts', inputs: ['stick', 'stick', 'flint'], yields: 1, label: 'Bolt bundle' },
-  { product: 'crossbow', inputs: ['plank', 'cord', 'trigger'], yields: 1, label: 'Crossbow' },
-  // The sentry has its own trigger (a second one lies at the outpost lookout): the crossbow stays yours.
-  { product: 'sentry-kit', inputs: ['trigger', 'spring', 'plank'], yields: 1, label: 'Sentry kit' },
+  { product: 'torch', inputs: ['stick', 'reeds', 'resin'], yields: 1, label: 'Torch', part: false },
+  { product: 'spear', inputs: ['stick', 'flint', 'cord'], yields: 1, label: 'Spear', part: false },
+  { product: 'bolts', inputs: ['stick', 'stick', 'flint'], yields: 1, label: 'Bolt bundle', part: false },
+  { product: 'crossbow', inputs: ['plank', 'limb', 'trigger'], yields: 1, label: 'Crossbow', part: false },
+  // The sentry has its own limb and trigger on a log mount: the crossbow stays yours.
+  { product: 'sentry-kit', inputs: ['log', 'limb', 'trigger'], yields: 1, label: 'Sentry kit', part: false },
+  { product: 'cord', inputs: ['reeds', 'reeds', 'reeds'], yields: 1, label: 'Cord', part: true },
+  // A log split on the camp stump gives two planks as well.
+  { product: 'plank', inputs: ['stick', 'stick', 'resin'], yields: 1, label: 'Plank', part: true },
+  { product: 'trigger', inputs: ['plank', 'stick', 'flint'], yields: 1, label: 'Trigger latch', part: true },
+  { product: 'limb', inputs: ['stick', 'cord', 'resin'], yields: 1, label: 'Bow limb', part: true },
 ] as const;
 
 export type BenchRecipe = (typeof BENCH_RECIPES)[number];
@@ -28,6 +38,12 @@ export function matchBench(kinds: readonly string[]): number {
   return benchIndex.get(sortedKey(kinds)) ?? -1;
 }
 export const recipeBit = (index: number) => 1 << index;
+/** The parts' bits: known from the start, whatever the save says. */
+export const PART_RECIPES = BENCH_RECIPES.reduce((mask, recipe, i) => (recipe.part ? mask | recipeBit(i) : mask), 0);
+/** Every recipe the keeper knows: the ones pages taught or experiments found, plus the parts. */
+export const knownRecipes = (learned: number) => learned | PART_RECIPES;
+/** How many of the page-taught products are known (the journal's tally). */
+export const PRODUCT_COUNT = BENCH_RECIPES.filter((recipe) => !recipe.part).length;
 export const benchRecipeIndex = (product: string) => BENCH_RECIPES.findIndex((r) => r.product === product);
 
 /** Pot: any two stew ingredients. Value is 1.5× the ingredients, rounded. */

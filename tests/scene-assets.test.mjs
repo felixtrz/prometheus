@@ -36,6 +36,7 @@ const props = await load('src/scene-assets/valley-props.scene-asset.ts');
 const camp = await load('src/scene-assets/camp-props.scene-asset.ts');
 const items = await load('src/scene-assets/items.scene-asset.ts');
 const kit = await load('src/scene-assets/valley-kit.scene-asset.ts');
+const layout = await load('src/scene-assets/valley-layout.scene-asset.ts');
 const scene = JSON.parse(readFileSync(join(root, 'public/scenes/main.iwsdk.scene.json'), 'utf8'));
 
 const meshesOf = (object) => { const list = []; object.traverse((o) => { if (o.isMesh) list.push(o); }); return list; };
@@ -104,7 +105,7 @@ test('lit fuel beds glow as charcoal between charred sticks, never as a pale pla
   }
 });
 
-test('the reed clump leaves the cord\'s spot clear, and every clump turns it to dry land', async () => {
+test('the reed clump leaves the reeds\' spot clear, and every brook clump turns it to dry land', async () => {
   const mesh = meshesOf(props.reedClump)[0];
   const p = mesh.geometry.getAttribute('position');
   let nearest = Infinity;
@@ -119,9 +120,11 @@ test('the reed clump leaves the cord\'s spot clear, and every clump turns it to 
     clumps++;
     const [x, , z] = node.transform.position, yaw = node.transform.rotationDeg[1] * Math.PI / 180;
     const here = terrain.brookNearest(x, z), ahead = terrain.brookNearest(x + Math.sin(yaw) * .5, z + Math.cos(yaw) * .5);
-    assert.ok(ahead > here + .35, `${node.id}: +Z (the cord's side) points away from the brook`);
+    // Brook-side clumps lean to the water; the camp clumps stand on dry ground, facing camp.
+    if (here < 4) assert.ok(ahead > here + .35, `${node.id}: +Z (the reeds' side) points away from the brook`);
+    assert.match(node.components?.ResourceNode?.yields ?? '', /^reeds(,reeds)*$/, `${node.id} yields reeds`);
   });
-  assert.equal(clumps, 3);
+  assert.equal(clumps, 5, 'three by the brook, two by camp');
 });
 
 test('journal pages carry a faint warm self-light through their own ink', () => {
@@ -130,12 +133,13 @@ test('journal pages carry a faint warm self-light through their own ink', () => 
   assert.equal(page.material.emissiveMap, page.material.map, 'the writing stays dark');
 });
 
-test('the pack roll is a leather roll (no spiral), about the old size', () => {
+test('the backpack is an upright rucksack standing on its base at the catalog rest height', () => {
   const box = new core.Box3().setFromObject(items.itemAssets['pack-roll']);
   const size = box.getSize(new core.Vector3());
-  assert.ok(size.x > .5 && size.x < .62, `length ${size.x.toFixed(3)}`);
-  assert.ok(size.y < .32 && size.z < .32, `section ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`);
-  assert.ok(box.max.y > .17 && box.max.y < .22, 'the carry loop stands where the old handle did');
+  assert.ok(size.x > .3 && size.x < .5, `width ${size.x.toFixed(3)}`);
+  assert.ok(size.y > .38 && size.y < .5, `height ${size.y.toFixed(3)}`);
+  assert.ok(size.z > .18 && size.z < .28, `depth ${size.z.toFixed(3)}`);
+  assert.ok(Math.abs(box.min.y + .107) < .005, `the base sits 10.7 cm below the origin (${box.min.y.toFixed(3)})`);
 });
 
 test('ground stones are never flint-sized', () => {
@@ -155,6 +159,8 @@ test('repeated trees stay cheap (S17)', () => {
     const count = node.content.distribution.transforms.length;
     if (node.content.prefab === 'far-pine') far += count; else valley += count;
   });
-  assert.equal(far, 335, 'split belts keep every far pine');
-  assert.equal(valley, 135, 'split stands keep every valley pine');
+  // The scene's patterns are baked from valley-layout (the journey's clearings already removed).
+  const count = (stands) => Object.values(stands).reduce((sum, list) => sum + list.length, 0);
+  assert.equal(far, count(layout.FAR_PINES), 'split belts keep every far pine');
+  assert.equal(valley, count(layout.VALLEY_PINES), 'split stands keep every valley pine');
 });

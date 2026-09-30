@@ -1,9 +1,11 @@
 <!--
   Wrist band (left grip, inside of the forearm). Bound by src/game/systems/wrist-system.ts.
-  Display only: pointer events are off so the left ray never hovers it.
+  Display, plus one control: the Comfort button (bottom) opens a small row of chips
+  (walk speed, turning, tunnel; settings.ts cycleSetting, the same as the journal board
+  and the start panel). Tap a chip to step it; the row closes itself after a while.
   Health and food bars sit in their own dark well and shift green -> amber -> red; while a
   stew's well-fed buff lasts, a warm "Well fed" line with its time left sits under them.
-  Natural size 40 x ~34 units; the system scales it to ~12 cm wide.
+  Natural size 40 x ~40 units; the system scales it to ~12 cm wide.
   Classes are prefixed "wr-" (UIKit classes share one global stylesheet).
 -->
 <style>
@@ -25,7 +27,6 @@
     border-color: #75634a;
     border-width: 0.3;
     border-radius: 2.4;
-    pointer-events: none;
   }
   .wr-row {
     display: flex;
@@ -198,6 +199,66 @@
     font-weight: 700;
     color: #d4b180;
   }
+  .wr-comfort-btn {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.9;
+    width: 100%;
+    height: 4.6;
+    margin-top: 0.3;
+    border-radius: 1;
+    border-width: 0.2;
+    border-color: #4c5c50;
+    background-color: #1e2b24;
+    cursor: pointer;
+  }
+  .wr-comfort-btn:hover { background-color: #2c3d33; }
+  .wr-comfort-icon {
+    flex-shrink: 0;
+    width: 2.4;
+    height: 2.4;
+    color: #a5b2a5;
+  }
+  .wr-comfort-label {
+    font-size: 2.1;
+    font-weight: 700;
+    color: #c3cdbf;
+  }
+  .wr-comfort-row {
+    display: none;
+    flex-direction: row;
+    gap: 0.8;
+    width: 100%;
+  }
+  .wr-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 30%;
+    flex-grow: 1;
+    padding-top: 0.6;
+    padding-bottom: 0.7;
+    padding-left: 0.9;
+    padding-right: 0.5;
+    border-radius: 0.9;
+    border-width: 0.2;
+    border-color: #667567;
+    background-color: #111a16;
+    cursor: pointer;
+  }
+  .wr-chip:hover { background-color: #2c3d33; }
+  .wr-chip-label {
+    font-size: 1.7;
+    font-weight: 700;
+    color: #a5b2a5;
+  }
+  .wr-chip-val {
+    font-size: 2.3;
+    font-weight: 700;
+    color: #e9c58f;
+  }
 </style>
 <div class="wr-root">
   <div class="wr-row wr-spread">
@@ -232,8 +293,8 @@
   </div>
   <div class="wr-rule"></div>
   <span id="wr-obj-label" class="wr-eyebrow">NOW</span>
-  <span id="wr-obj" class="wr-obj">Light the campfire</span>
-  <span id="wr-hint" class="wr-hint">Take the lighter, pull the trigger, hold it in the logs.</span>
+  <span id="wr-obj" class="wr-obj">Get out of the wreck</span>
+  <span id="wr-hint" class="wr-hint">Axe above the door; strike the door till it gives.</span>
   <div id="wr-tonight-row" class="wr-tonight-row">
     <Moon class="wr-tonight-icon"></Moon>
     <span class="wr-tonight">Tonight: Survive the night, then sleep</span>
@@ -243,4 +304,13 @@
     <span class="wr-bolt-label">Bolts loaded</span>
     <span id="wr-bolts" class="wr-bolt-val">0</span>
   </div>
+  <div id="wr-comfort-row" class="wr-comfort-row">
+    <button id="wr-set-speed" class="wr-chip"><span class="wr-chip-label">SPEED</span><span id="wr-set-speed-val" class="wr-chip-val">Normal</span></button>
+    <button id="wr-set-turn" class="wr-chip"><span class="wr-chip-label">TURN</span><span id="wr-set-turn-val" class="wr-chip-val">45°</span></button>
+    <button id="wr-set-tunnel" class="wr-chip"><span class="wr-chip-label">TUNNEL</span><span id="wr-set-tunnel-val" class="wr-chip-val">On</span></button>
+  </div>
+  <button id="wr-comfort-btn" class="wr-comfort-btn">
+    <SlidersHorizontal class="wr-comfort-icon"></SlidersHorizontal>
+    <span id="wr-comfort-label" class="wr-comfort-label">Comfort</span>
+  </button>
 </div>

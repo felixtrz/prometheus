@@ -1,7 +1,8 @@
-import { createSystem, Entity, ScreenSpace, Types, UIKitMLAsset, Vector3 } from '@iwsdk/core';
+import { createSystem, Entity, RayInteractable, ScreenSpace, Types, UIKitMLAsset, Vector3 } from '@iwsdk/core';
 import { bus } from '../bus.js';
 import { Campfire, GameState, Held, Item } from '../components.js';
 import { phaseAt } from '../rules.js';
+import { type ComfortKey, cycleSetting, onSettings, settingLit, settingText } from '../settings.js';
 import { currentObjective, ENDING, objectiveIndex, OBJECTIVES } from '../story.js';
 import { LANDMARKS } from '../terrain.js';
 import {
@@ -11,7 +12,18 @@ import {
 import { SurvivalSystem } from './survival-system.js';
 
 const SKY_IDS = SKY_ICON_SUFFIX.map((s) => `wr-ic-${s}`);
+/** The wrist's comfort chips: the movement ones (the board and start panel carry all five). */
+const COMFORT: readonly { key: ComfortKey; id: string; value: string; name: string }[] = [
+  { key: 'speed', id: 'wr-set-speed', value: 'wr-set-speed-val', name: 'Wrist Walking Speed Setting' },
+  { key: 'turn', id: 'wr-set-turn', value: 'wr-set-turn-val', name: 'Wrist Turning Setting' },
+  { key: 'tunnel', id: 'wr-set-tunnel', value: 'wr-set-tunnel-val', name: 'Wrist Comfort Tunnel Setting' },
+];
+/** The comfort row folds away after this long without a tap (s). */
+const COMFORT_IDLE = 10;
+const CHIP_LIT: Style = { color: '#e9c58f' };
+const CHIP_OFF: Style = { color: '#8c9d8c' };
 const IDS: readonly string[] = [
+  ...COMFORT.flatMap((c) => [c.id, c.value]), 'wr-comfort-btn', 'wr-comfort-label', 'wr-comfort-row',
   ...SKY_IDS, 'wr-day', 'wr-ic-fire', 'wr-fire', 'wr-hunger-fill', 'wr-hunger-val', 'wr-health-fill', 'wr-health-val',
   'wr-ic-health', 'wr-ic-hunger',
   'wr-obj-label', 'wr-obj', 'wr-hint', 'wr-tonight-row', 'wr-bolts-row', 'wr-bolts', 'wr-fed-row', 'wr-fed',
@@ -33,7 +45,8 @@ const OBJ_TITLE = OBJECTIVES.map((o) => plain(o.title));
 const OBJ_HINT = OBJECTIVES.map((o) => clip(plain(o.wrist), WRIST_HINT_CHARS));
 const ENDING_HOME = plain(ENDING.home);
 const ENDING_REST = plain(ENDING.rest);
-const DAY_TEXT = Array.from({ length: 100 }, (_, i) => `Day ${i}`);
+/** Day 0 is the crash's grey hour, before the first sunrise (the journey starts there). */
+const DAY_TEXT = Array.from({ length: 100 }, (_, i) => (i === 0 ? 'Dawn' : `Day ${i}`));
 const BOLT_TEXT = Array.from({ length: 65 }, (_, i) => `${i}`);
 /** Campfire burns 1/3 fuel per second (smothering aside): seconds left = fuel * 3. */
 const FIRE_SECONDS_PER_FUEL = 3;
@@ -65,6 +78,10 @@ const FIRE_STYLE: readonly Style[] = [{ color: '#8c9d8c' }, { color: '#e58a55' }
  * After the ending: ENDING.home, then ENDING.rest within 8 m of the campfire.
  *
  * Hidden until the first 'journey-begin' (the start panel stands alone before that).
+ *
+ * One control: the Comfort button opens a row of chips (walk speed, turning, tunnel;
+ * settings.ts cycleSetting, as on the board and the start panel) that folds away after
+ * COMFORT_IDLE seconds without a tap. The panel is ray-interactable while shown.
  *
  * In the desktop browser the same panel doubles as a small top-left HUD via
  * ScreenSpace (disable with `browserHud`); IWSDK moves it back under the grip in XR.
@@ -112,12 +129,16 @@ export class WristSystem extends createSystem({
   private snapFireBand = -1;
   /** Hidden until a journey begins (the start panel holds the stage alone). */
   private shown = false;
+  private comfortOpen = false;
+  private comfortAt = 0;
+  private readonly onComfort = () => this.setComfortOpen(!this.comfortOpen);
 
   init(): void {
     this.cleanupFuncs.push(
       bus.on('journey-begin', () => this.setShown(true)),
       bus.on('well-fed', (event) => { this.fedSeconds = Math.max(0, event.seconds); this.fedAt = this.now; }),
       bus.on('new-game', () => { this.fedSeconds = 0; }),
+      onSettings(() => this.applyComfort()),
       this.queries.game.subscribe('qualify', (entity) => { this.game = entity; this.resetSnapshots(); }, true),
       this.queries.game.subscribe('disqualify', (entity) => {
         if (this.game !== entity) return;
@@ -150,13 +171,28 @@ export class WristSystem extends createSystem({
     void this.world.assets.instantiate<UIKitMLAsset>('wrist-hud').then((hud) => {
       if (this.disposed) { hud.dispose(); return; }
       this.hud = hud;
-      hud.pointerEvents = 'none';
       this.entity = this.world.createTransformEntity(hud, {
         parent: this.world.playerSpaceEntities.gripSpaces.left,
         persistent: true,
       });
-      this.ui = new PanelText(hud, IDS, 'wrist-hud');
+      const ui = this.ui = new PanelText(hud, IDS, 'wrist-hud');
       hud.document.visible = this.shown;
+      const bind = (id: string, name: string, handler: () => void) => {
+        const element = ui.get(id);
+        if (!element) return;
+        element.name = name;
+        element.addEventListener('click', handler);
+        this.cleanupFuncs.push(() => element.removeEventListener('click', handler));
+      };
+      bind('wr-comfort-btn', 'Wrist Comfort Button', this.onComfort);
+      for (const chip of COMFORT) {
+        bind(chip.id, chip.name, () => {
+          this.comfortAt = this.now;
+          cycleSetting(chip.key);
+        });
+      }
+      this.applyComfort();
+      this.applyInteractive();
       this.placeOnWrist();
       this.cleanupFuncs.push(
         this.config.offsetX.subscribe(() => this.placeOnWrist()),
@@ -174,7 +210,38 @@ export class WristSystem extends createSystem({
   private setShown(shown: boolean): void {
     this.shown = shown;
     if (this.hud) this.hud.document.visible = shown;
+    this.applyInteractive();
     this.resetSnapshots();
+  }
+
+  /** Rays reach the wrist (its Comfort button) only while it is shown. */
+  private applyInteractive(): void {
+    const entity = this.entity;
+    const hud = this.hud;
+    if (!entity || !hud) return;
+    if (this.shown && !entity.hasComponent(RayInteractable)) entity.addComponent(RayInteractable);
+    if (!this.shown && entity.hasComponent(RayInteractable)) entity.removeComponent(RayInteractable);
+    hud.pointerEvents = this.shown ? 'auto' : 'none';
+    if (!this.shown) this.setComfortOpen(false);
+  }
+
+  private setComfortOpen(open: boolean): void {
+    this.comfortOpen = open;
+    this.comfortAt = this.now;
+    const ui = this.ui;
+    if (!ui) return;
+    ui.style('wr-comfort-row', open ? SHOW : HIDE);
+    ui.text('wr-comfort-label', open ? 'Done' : 'Comfort');
+  }
+
+  /** Chip values from the live settings. */
+  private applyComfort(): void {
+    const ui = this.ui;
+    if (!ui) return;
+    for (const chip of COMFORT) {
+      ui.text(chip.value, settingText(chip.key, true));
+      ui.style(chip.value, settingLit(chip.key) ? CHIP_LIT : CHIP_OFF);
+    }
   }
 
   private placeOnWrist(): void {
@@ -190,7 +257,7 @@ export class WristSystem extends createSystem({
     const entity = this.entity;
     if (!entity) return;
     if (on && !entity.hasComponent(ScreenSpace)) {
-      entity.addComponent(ScreenSpace, { width: '250px', height: '262px', top: '16px', left: '16px', zOffset: 0.25 });
+      entity.addComponent(ScreenSpace, { width: '250px', height: '290px', top: '16px', left: '16px', zOffset: 0.25 });
     } else if (!on && entity.hasComponent(ScreenSpace)) {
       entity.removeComponent(ScreenSpace);
       // Return the document from the camera to the grip-space host.
@@ -217,6 +284,7 @@ export class WristSystem extends createSystem({
     const ui = this.ui;
     const game = this.game;
     if (!ui || !game?.active || !this.shown) return;
+    if (this.comfortOpen && this.now - this.comfortAt > COMFORT_IDLE) this.setComfortOpen(false);
 
     const hunger = clampPercent(game.getValue(GameState, 'hunger') ?? 0);
     if (hunger !== this.snapHunger) {

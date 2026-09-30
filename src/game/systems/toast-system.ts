@@ -1,4 +1,4 @@
-import { createSystem, Entity, Object3D, Types, UIKitMLAsset, Vector3 } from '@iwsdk/core';
+import { Box3, createSystem, Entity, Object3D, Types, UIKitMLAsset, Vector3 } from '@iwsdk/core';
 import { bus, GameEvent } from '../bus.js';
 import { itemInfo } from '../catalog.js';
 import { GameState, Held, Item } from '../components.js';
@@ -6,6 +6,7 @@ import { benchRecipeIndex, BENCH_RECIPES, stewName } from '../recipes.js';
 import { phaseAt } from '../rules.js';
 import { onSettings, settings } from '../settings.js';
 import { currentObjective, ENDING, objectiveIndex, OBJECTIVES, OPENING, PAGES } from '../story.js';
+import { LANDMARKS } from '../terrain.js';
 import { lineById } from '../voice-lines.js';
 import { BackpackSystem } from './backpack-system.js';
 import { GuideSystem } from './guide-system.js';
@@ -105,16 +106,36 @@ const SUB_DOWN_OFF = -5 * DEG;
 const SUB_SIDE = 12 * DEG;
 const SUB_FADE_IN = 0.3;
 const SUB_FADE_OUT = 0.6;
-/** Lazy follow: re-centre when the wanted spot moves this far off (rad) or the head moves this far (m). */
+/**
+ * The panel moves with the eye every frame (never trailing a walk). Lazy follow for the rest:
+ * re-centre (and turn) when the wanted direction moves this far off (rad), or the mode, the
+ * shade's side or the journal board's avoidance changes.
+ */
 const SUB_FOLLOW_ANGLE = 12 * DEG;
-const SUB_FOLLOW_MOVE = 0.3;
 /**
  * Drawn over the world (no depth test, after the toasts): a held thing nearer than the
- * panel inside this cone around it (a bowl at the lips, a page, a torch raised) fades the
- * words to SUB_HELD_FADE rather than painting over it.
+ * panel inside a cone around it (a bowl at the lips, a page, a torch raised) fades the
+ * words to SUB_HELD_FADE rather than painting over it. The cone is SUB_HELD_CONE plus the
+ * angle the thing's own bounds cover (a bowl at the mouth covers far more than 14 degrees).
  */
-const SUB_HELD_CONE = Math.cos(14 * DEG);
+const SUB_HELD_CONE = 14 * DEG;
+const SUB_HELD_CONE_MAX = 70 * DEG;
+const SUB_HELD_RADIUS_MAX = 0.6;
 const SUB_HELD_FADE = 0.35;
+/**
+ * The camp journal board (scene node 'camp-journal', natural 150 x ~100 units at 1 unit =
+ * 1 cm, scaled by its node): while the gaze rests on it within SUB_BOARD_RANGE m, the
+ * subtitle moves just below (or above) it, SUB_BOARD_GAP past its edge, never over it.
+ */
+const JOURNAL_NODE = 'camp-journal';
+const SUB_BOARD_HALF_W = 0.75;
+const SUB_BOARD_HALF_H = 0.5;
+const SUB_BOARD_RANGE = 2.5;
+const SUB_BOARD_GAP = 4 * DEG;
+/** The subtitle's text when its line has no clip yet and subtitles are off (it shows anyway). */
+const SUB_UNVOICED = 'no voice yet';
+/** The epilogue points home when the journey ends this far (m) from the journal board. */
+const TALLY_FAR = 8;
 const SUB_ROOT_SETUP: Style = { depthTest: false, renderOrder: 21 };
 
 const OPACITY_STEPS = 10;
@@ -177,10 +198,14 @@ function estimateHeight(title: string, body: string, scale: number): number {
  * the eye, 15 degrees under a level gaze and leaning 12 degrees toward the shade (under
  * the toast stack, clear of the fire), and 16 degrees over a gaze lowered past 10 degrees
  * (over the flames or the pot being looked at, never on it); shown for the line's
- * `seconds` with its subtitle-only control `hint` on a second line, lazily following the
- * view, fading to 35% behind a held thing, and never queued behind, merged with or hidden
- * by ordinary toasts. A newer line replaces it; a line cut short ('guide-end' with `cut`,
- * including a line gone stale) fades it at once. Settings: subtitles off hides it.
+ * `seconds` with its subtitle-only control `hint` on a second line, carried with the eye
+ * and lazily following the view (square to the gaze's yaw, pitched to the eye), moved
+ * below or above the journal board while the gaze rests on it, fading to 35% behind a
+ * held thing (its bounds), and never queued behind, merged with or hidden by ordinary
+ * toasts. A newer line replaces it; a line cut short ('guide-end' with `cut`, including a
+ * line gone stale) fades it at once. Settings: subtitles off hides a voiced line (its
+ * control hint shows as a toast); a line with no clip yet shows anyway, marked.
+ * The epilogue, far from camp, points home to the journal's tally.
  */
 export class ToastSystem extends createSystem({
   game: { required: [GameState] },
@@ -234,10 +259,25 @@ export class ToastSystem extends createSystem({
   private subAge = 0;
   private subHold = 0;
   private subActive = false;
-  private subPending: { text: string; seconds: number; hint: string } | null = null;
+  private subPending: { text: string; seconds: number; hint: string; voiced: boolean } | null = null;
   private subOpacity = -1;
   private subTarget = new Vector3();
   private subAnchorEye = new Vector3();
+  /** The eye last frame: the panel is carried along with it. */
+  private readonly subLastEye = new Vector3();
+  /** Yaw (about +Y) the panel faces: the gaze's, taken at each re-target and eased to. */
+  private subYaw = 0;
+  private subYawTarget = 0;
+  /** The current line plays its clip (subtitles off hides it then). */
+  private subVoiced = false;
+  /** Journal board avoidance: 0 off the board, -1 below it, 1 above it. */
+  private subBoard = 0;
+  private subAnchorBoard = 0;
+  /** The camp journal panel (looked up once per line; re-found after a level reload). */
+  private board?: Object3D;
+  /** Held-item bounding radius about its origin (m), measured once per object. */
+  private readonly heldRadius = new WeakMap<Object3D, number>();
+  private readonly box = new Box3();
 
   init(): void {
     this.cleanupFuncs.push(
@@ -251,8 +291,9 @@ export class ToastSystem extends createSystem({
       this.queries.held.subscribe('disqualify', (entity) => {
         if (entity.getValue(Item, 'kind') === 'page') this.reading = Math.max(0, this.reading - 1);
       }),
-      // Subtitles turned off in the journal's comfort settings: the words go at once (the voice still plays).
-      onSettings((next) => { if (!next.subtitles) this.hideSubtitle(); }),
+      // Subtitles turned off in the journal's comfort settings: a voiced line's words go at once (the voice
+      // still plays); a line without a clip keeps its words (it has no other way to be heard).
+      onSettings((next) => { if (!next.subtitles && this.subVoiced) this.hideSubtitle(); }),
       () => {
         this.disposed = true;
         for (const slot of this.slots) slot.entity.dispose({ disposeResources: false });
@@ -316,22 +357,35 @@ export class ToastSystem extends createSystem({
     const entity = this.world.createTransformEntity(holder, { persistent: true });
     this.sub = { asset, entity, root, text, hint };
     if (this.subPending) {
-      const { text: line, seconds, hint: note } = this.subPending;
+      const { text: line, seconds, hint: note, voiced } = this.subPending;
       this.subPending = null;
-      this.speak(line, seconds, note);
+      this.speak(line, seconds, note, voiced);
     }
   }
 
-  /** Show the shade's line for `seconds`, its control hint below (a newer line replaces the current one). */
-  private speak(line: string, seconds: number, hint = ''): void {
+  /**
+   * Show the shade's line for `seconds`, its control hint below (a newer line replaces the current one).
+   * With subtitles off a voiced line shows nothing but its control hint, as a toast; a line with no
+   * clip shows anyway (marked SUB_UNVOICED), or the shade would say nothing at all.
+   */
+  private speak(line: string, seconds: number, hint = '', voiced = false): void {
     const text = plain(line).trim();
-    if (!text || !settings.subtitles) return;
-    const note = plain(hint).trim();
+    if (!text) return;
+    let note = plain(hint).trim();
+    if (!settings.subtitles) {
+      if (voiced) {
+        if (note) this.post(note, '', 'info', -1, 5, '', 'guide-hint');
+        return;
+      }
+      note = note ? `${note} (${SUB_UNVOICED})` : SUB_UNVOICED;
+    }
     const sub = this.sub;
     if (!sub) {
-      this.subPending = { text, seconds, hint: note };
+      this.subPending = { text, seconds, hint: note, voiced };
       return;
     }
+    this.subVoiced = voiced;
+    if (!this.board?.parent) this.board = this.world.getSceneObject(JOURNAL_NODE);
     if (text !== this.subText) {
       this.subText = text;
       sub.text.setProperties({ text });
@@ -355,14 +409,28 @@ export class ToastSystem extends createSystem({
     const object = sub.entity.object3D!;
     if (!wasActive) {
       object.position.copy(this.subTarget);
+      this.subYaw = this.subYawTarget;
       this.subVeil = 1;
     }
-    object.lookAt(this.eye);
+    this.subLastEye.copy(this.eye);
+    this.faceEye(object);
     object.visible = true;
+  }
+
+  /**
+   * Turn the panel square to the gaze's yaw (never rolled or yawed by a sideways offset, which
+   * tilts its level edge in view), pitched only toward the eye so a lowered gaze never sees it edge-on.
+   */
+  private faceEye(object: Object3D): void {
+    const sy = Math.sin(this.subYaw), cy = Math.cos(this.subYaw);
+    const dx = this.eye.x - object.position.x, dy = this.eye.y - object.position.y, dz = this.eye.z - object.position.z;
+    const ahead = Math.max(0.1, dx * sy + dz * cy);
+    object.rotation.set(-Math.atan2(dy, ahead), this.subYaw, 0, 'YXZ');
   }
 
   private hideSubtitle(): void {
     this.subActive = false;
+    this.subVoiced = false;
     this.subPending = null;
     if (this.sub) this.sub.entity.object3D!.visible = false;
   }
@@ -376,12 +444,46 @@ export class ToastSystem extends createSystem({
     const pitch = Math.asin(Math.max(-1, Math.min(1, this.look.y)));
     if (this.subMode === 0 && pitch < SUB_DOWN_ON) this.subMode = 1;
     else if (this.subMode === 1 && pitch > SUB_DOWN_OFF) this.subMode = 0;
-    const want = this.subMode ? Math.min(SUB_ABOVE_MAX, pitch + SUB_ABOVE) : Math.min(60 * DEG, pitch - SUB_BELOW);
+    const want = this.boardPitch(this.subMode ? Math.min(SUB_ABOVE_MAX, pitch + SUB_ABOVE) : Math.min(60 * DEG, pitch - SUB_BELOW));
     this.subSide = this.guideSystem()?.shadeSide ?? 0;
     // Yaw of the view (+Z = 0); turning right lowers it.
     const yaw = Math.atan2(this.look.x, this.look.z) - this.subSide * SUB_SIDE;
     const c = Math.cos(want);
     return out.set(Math.sin(yaw) * c, Math.sin(want), Math.cos(yaw) * c);
+  }
+
+  /**
+   * The subtitle's pitch, moved off the journal board while the gaze rests on it (within
+   * SUB_BOARD_RANGE): just under its bottom edge or over its top, whichever is nearer `want`
+   * (kept while the gaze stays on the board). Reads this.eye/this.look; updates subBoard.
+   */
+  private boardPitch(want: number): number {
+    const board = this.board;
+    const was = this.subBoard;
+    this.subBoard = 0;
+    if (!board?.parent) return want;
+    const m = board.matrixWorld.elements;
+    const rl = Math.hypot(m[0], m[1], m[2]), ul = Math.hypot(m[4], m[5], m[6]), nl = Math.hypot(m[8], m[9], m[10]);
+    if (rl < 1e-6 || ul < 1e-6 || nl < 1e-6) return want;
+    const e = this.eye, l = this.look;
+    const facing = (l.x * m[8] + l.y * m[9] + l.z * m[10]) / nl;
+    if (Math.abs(facing) < 0.15) return want;
+    const t = ((m[12] - e.x) * m[8] + (m[13] - e.y) * m[9] + (m[14] - e.z) * m[10]) / nl / facing;
+    if (t <= 0 || t > SUB_BOARD_RANGE + (was ? 0.3 : 0)) return want;
+    // Where the gaze meets the board, in its own (unscaled) units.
+    const px = e.x + l.x * t - m[12], py = e.y + l.y * t - m[13], pz = e.z + l.z * t - m[14];
+    const u = (px * m[0] + py * m[1] + pz * m[2]) / (rl * rl);
+    const v = (px * m[4] + py * m[5] + pz * m[6]) / (ul * ul);
+    const slack = was ? 1.15 : 1;
+    if (Math.abs(u) > SUB_BOARD_HALF_W * slack || Math.abs(v) > SUB_BOARD_HALF_H * slack) return want;
+    // The board's bottom and top edges straight across from the gaze point.
+    const cu = Math.max(-SUB_BOARD_HALF_W, Math.min(SUB_BOARD_HALF_W, u));
+    const bx = m[12] + m[0] * cu - e.x, by = m[13] + m[1] * cu - e.y, bz = m[14] + m[2] * cu - e.z;
+    const hx = m[4] * SUB_BOARD_HALF_H, hy = m[5] * SUB_BOARD_HALF_H, hz = m[6] * SUB_BOARD_HALF_H;
+    const below = Math.max(-70 * DEG, Math.atan2(by - hy, Math.hypot(bx - hx, bz - hz)) - SUB_BOARD_GAP);
+    const above = Math.min(45 * DEG, Math.atan2(by + hy, Math.hypot(bx + hx, bz + hz)) + SUB_BOARD_GAP);
+    this.subBoard = was !== 0 ? was : Math.abs(above - want) < Math.abs(below - want) ? 1 : -1;
+    return this.subBoard > 0 ? above : below;
   }
 
   /** Where the subtitle belongs for the current view: SUB_DISTANCE m out along subtitleDirection. */
@@ -393,9 +495,31 @@ export class ToastSystem extends createSystem({
     this.subAnchorEye.copy(this.eye);
     this.subAnchorMode = this.subMode;
     this.subAnchorSide = this.subSide;
+    this.subAnchorBoard = this.subBoard;
+    // Square to the gaze (straight down it has no yaw: keep the last).
+    if (this.look.x * this.look.x + this.look.z * this.look.z > 0.0025) this.subYawTarget = Math.atan2(this.look.x, this.look.z) + Math.PI;
   }
 
-  /** 1, or SUB_HELD_FADE while a held thing sits between the eye and the words. */
+  /** A held thing's bounding radius about its origin (m), measured once. */
+  private radiusOf(held: Object3D, origin: Vector3): number {
+    let radius = this.heldRadius.get(held);
+    if (radius !== undefined) return radius;
+    this.box.setFromObject(held);
+    if (this.box.isEmpty()) radius = 0.05;
+    else {
+      const b = this.box;
+      radius = Math.hypot(
+        Math.max(Math.abs(b.min.x - origin.x), Math.abs(b.max.x - origin.x)),
+        Math.max(Math.abs(b.min.y - origin.y), Math.abs(b.max.y - origin.y)),
+        Math.max(Math.abs(b.min.z - origin.z), Math.abs(b.max.z - origin.z)),
+      );
+    }
+    radius = Math.min(SUB_HELD_RADIUS_MAX, radius);
+    this.heldRadius.set(held, radius);
+    return radius;
+  }
+
+  /** 1, or SUB_HELD_FADE while a held thing (its bounds, not just its centre) sits between the eye and the words. */
   private heldVeil(object: Object3D): number {
     const toX = object.position.x - this.eye.x, toY = object.position.y - this.eye.y, toZ = object.position.z - this.eye.z;
     const toLength = Math.hypot(toX, toY, toZ) || 1;
@@ -406,7 +530,8 @@ export class ToastSystem extends createSystem({
       const hx = this.subTmp.x - this.eye.x, hy = this.subTmp.y - this.eye.y, hz = this.subTmp.z - this.eye.z;
       const hLength = Math.hypot(hx, hy, hz);
       if (hLength < 0.05 || hLength > toLength) continue;
-      if ((hx * toX + hy * toY + hz * toZ) / (hLength * toLength) > SUB_HELD_CONE) return SUB_HELD_FADE;
+      const cone = Math.min(SUB_HELD_CONE_MAX, SUB_HELD_CONE + Math.atan(this.radiusOf(held, this.subTmp) / hLength));
+      if ((hx * toX + hy * toY + hz * toZ) / (hLength * toLength) > Math.cos(cone)) return SUB_HELD_FADE;
     }
     return 1;
   }
@@ -421,19 +546,28 @@ export class ToastSystem extends createSystem({
       return;
     }
     const object = sub.entity.object3D!;
-    // Lazy follow: stay put while the player glances about; glide to the new spot after a real turn,
-    // a walk, a lowered (or raised) gaze, or the shade changing sides.
+    // Carried with the eye every frame: a walk never leaves the words trailing (nor sliding in on a stop).
     this.camera.getWorldPosition(this.eye);
+    this.subTmp.copy(this.eye).sub(this.subLastEye);
+    object.position.add(this.subTmp);
+    this.subTarget.add(this.subTmp);
+    this.subAnchorEye.add(this.subTmp);
+    this.subLastEye.copy(this.eye);
+    // Lazy follow: stay put while the player glances about; glide to the new spot after a real turn,
+    // a lowered (or raised) gaze, the gaze resting on (or leaving) the journal board, or the shade changing sides.
     this.camera.getWorldDirection(this.look);
     const dir = this.subtitleDirection(this.subDir);
     this.subTmp.copy(this.subTarget).sub(this.subAnchorEye).normalize();
-    if (dir.dot(this.subTmp) < Math.cos(SUB_FOLLOW_ANGLE) || this.eye.distanceTo(this.subAnchorEye) > SUB_FOLLOW_MOVE
-      || this.subMode !== this.subAnchorMode || this.subSide !== this.subAnchorSide) {
+    if (dir.dot(this.subTmp) < Math.cos(SUB_FOLLOW_ANGLE) || this.subMode !== this.subAnchorMode
+      || this.subSide !== this.subAnchorSide || this.subBoard !== this.subAnchorBoard) {
       this.subtitleTarget(this.subTarget);
     }
     const k = Math.min(1, delta * 5);
     object.position.lerp(this.subTarget, k);
-    object.lookAt(this.eye);
+    let turn = this.subYawTarget - this.subYaw;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    this.subYaw += turn * k;
+    this.faceEye(object);
     this.subVeil += (this.heldVeil(object) - this.subVeil) * Math.min(1, delta * 6);
     const alpha = this.subVeil * (this.subAge < SUB_FADE_IN ? this.subAge / SUB_FADE_IN
       : this.subAge < SUB_FADE_IN + this.subHold ? 1 : 1 - (this.subAge - SUB_FADE_IN - this.subHold) / SUB_FADE_OUT);
@@ -581,7 +715,7 @@ export class ToastSystem extends createSystem({
         this.post(event.text, event.body ?? '', event.tone, event.hold ?? -1, 4, event.text, 'toast');
         return;
       case 'guide':
-        this.speak(event.text, event.seconds, event.hint);
+        this.speak(event.text, event.seconds, event.hint, event.voiced === true);
         // The farewell stands alone: nothing else on screen while he says goodbye.
         if (lineById(event.id)?.finale) for (let i = 0; i < this.slots.length; i++) this.hide(this.slots[i]);
         return;
@@ -589,8 +723,13 @@ export class ToastSystem extends createSystem({
         // Cut short (a wolf, a fade): the words fade out with the voice.
         if (event.cut && this.subActive) this.subHold = Math.min(this.subHold, Math.max(0, this.subAge - SUB_FADE_IN));
         return;
+      case 'epilogue':
+        // The tally lives on the journal at camp; the ending usually plays out at the Spire, far from it.
+        if (this.farFromJournal()) this.post(plain(ENDING.tally), '', 'info', -1, 6, '', 'epilogue');
+        return;
       case 'new-game':
         this.hideSubtitle();
+        this.board = undefined; // the level reloads: a new panel
         this.queue.length = 0;
         this.pending.length = 0;
         this.parked.length = 0;
@@ -602,6 +741,15 @@ export class ToastSystem extends createSystem({
         return;
       default:
     }
+  }
+
+  /** The player stands more than TALLY_FAR m from the journal board. */
+  private farFromJournal(): boolean {
+    if (!this.board?.parent) this.board = this.world.getSceneObject(JOURNAL_NODE);
+    this.camera.getWorldPosition(this.eye);
+    const m = this.board?.matrixWorld.elements;
+    const x = m ? m[12] : LANDMARKS.campfire.x, z = m ? m[14] : LANDMARKS.campfire.z;
+    return Math.hypot(this.eye.x - x, this.eye.z - z) > TALLY_FAR;
   }
 
   private postStage(stage: number): void {
@@ -783,7 +931,9 @@ export class ToastSystem extends createSystem({
     this.updateSubtitle(delta);
     // Never over the shade's words: wait while he speaks (bounded, in case a line stalls).
     const head = this.queue[0];
-    const speaking = !!head && this.guideSystem()?.speaking === true && this.now - head.at < SPEECH_HOLD_MAX;
+    // A voiced line's control hint (subtitles off) is the only word on screen: it need not wait.
+    const speaking = !!head && head.key !== 'guide-hint' && this.guideSystem()?.speaking === true
+      && this.now - head.at < SPEECH_HOLD_MAX;
     const blocked = this.reading > 0 || this.now < this.blockedUntil || speaking;
     // Situational hints held behind a long line or a page go stale ("strike the pad" after the craft).
     for (let i = this.queue.length - 1; i >= 0; i--) {

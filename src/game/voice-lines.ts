@@ -65,7 +65,12 @@ export type GuideCondition =
   | 'bench-wrong' // the bench bays hold three parts that make nothing
   | 'torch-lit' // the torch objective is done
   | 'sentry-built' // the sentry objective is done
-  | 'sentry-dry'; // a deployed sentry has no bolts left
+  | 'sentry-dry' // a deployed sentry has no bolts left
+  | 'in-wreck' // the keeper is inside the wreck's cabin
+  | 'near-door' // the keeper stands at the wreck's door (or has passed it)
+  | 'door-open' // the wreck's door is down
+  | 'axe-holstered' // the axe rides in a hip holster
+  | 'pack-owned'; // the pack has been found (taken up at least once)
 
 export type GuideLine = {
   /** Unique id; saved in GameState.guide once spoken. */
@@ -118,31 +123,97 @@ export const numberWord = (n: number): string => NUMBER_WORDS[n] ?? String(n);
  * every stolen flame, he guides the keeper to give the Spire's back, and goes free.
  */
 export const LINES: readonly GuideLine[] = [
-  // ── Arrival: the first how-to within ~10 s, the myth once the fire is lit ──
+  // ── The wreck (design/JOURNEY.md): out of the burning plane, a how-to within ~10 s ──
   {
     id: 'intro', on: ['journey:new+0.8'], priority: 10, ttl: 180, covers: ['key:opening'],
-    text: 'Wake, keeper. Your fire is cold. Close your hand on the lighter in your pack, there on the table.',
-    hint: 'Squeeze the grip button to hold.',
+    text: 'Wake, keeper. The fire is loose in here. Up, and to the door, there at the front.',
+    hint: 'Push the left stick to walk.',
   },
   {
     id: 'welcome', on: ['journey:resumed+1.5'], priority: 10, repeat: true, ttl: 180, defers: ['key:opening'],
     text: 'You return, keeper. The fire remembers you, even when you do not. Your left wrist shows what the valley asks of you next.',
   },
   {
-    id: 'grab', on: ['hand-near', 'done:intro+6'], priority: 8, unless: 'grabbed', ttl: 12,
+    id: 'wreck-door-nudge', on: ['done:intro+14'], priority: 7, unless: 'near-door', when: ['in-wreck'], ttl: 20,
+    text: 'This way, keeper. Follow the lights along the floor, to the door.',
+  },
+  {
+    id: 'wreck-axe', on: ['journey:door'], priority: 8, unless: 'door-open', ttl: 60,
+    text: 'Jammed. Above the door, keeper: the axe. Close your hand on it and take it down.',
+    hint: 'Squeeze the grip to hold.',
+  },
+  {
+    id: 'wreck-swing', on: ['journey:armed+0.4'], priority: 8, unless: 'door-open', ttl: 40,
+    text: 'Now the door. Strike it where it is bent, hard, from the shoulder.',
+    hint: 'Swing the axe into the door.',
+  },
+  {
+    id: 'wreck-harder', on: ['journey:door-glance'], priority: 7, unless: 'door-open', ttl: 15,
+    text: 'Harder, keeper. Put your weight behind the blow.',
+  },
+  {
+    id: 'wreck-out', on: ['journey:open+0.3'], priority: 8, ttl: 15,
+    text: 'It gives! Out, keeper, into the air.',
+  },
+  {
+    id: 'wreck-wolves', on: ['journey:outside+1.2'], priority: 8, ttl: 40,
+    text: 'Be still. On the hills: the Hollow. They fear the fire at your back. While it burns, they will not come near.',
+  },
+  {
+    id: 'wreck-holster', on: ['done:wreck-wolves+1'], priority: 8, unless: 'axe-holstered', ttl: 40,
+    text: 'Put the axe at your hip, keeper, in the empty holster beside your lighter. Keep your hands free.',
+    hint: 'Let go of it at your right hip.',
+  },
+  {
+    id: 'wreck-dawn', on: ['journey:dawn+1'], priority: 7, ttl: 60,
+    text: 'The light takes them, for now. Your people kept an outpost near here. Follow the trail, and the orange cloth on the posts.',
+  },
+  {
+    id: 'axe-left', on: ['journey:axe-left'], priority: 7, ttl: 30,
+    text: 'You left the axe behind, keeper. Go back for it. You will need it.',
+  },
+  {
+    id: 'waystation', on: ['journey:waystation'], priority: 7, unless: 'pack-owned', ttl: 60,
+    text: 'Your pack, keeper, there on the table. Take it up, and put it on your back.',
+    hint: 'Grab it; let it go behind your shoulder.',
+  },
+  {
+    id: 'pack-left', on: ['journey:pack-left'], priority: 7, unless: 'pack-owned', ttl: 30,
+    text: 'Your pack, keeper. Go back to the table for it; your hands cannot carry a journey.',
+  },
+  {
+    id: 'forest', on: ['journey:forest+3'], priority: 6, ttl: 60,
+    text: 'The camp lies beyond this forest. On the way, fell a tree for firewood, and pick the mushrooms you pass.',
+    hint: 'Swing the axe into a trunk.',
+  },
+  {
+    id: 'mushroom', on: ['harvest:mushroom'], priority: 4, ttl: 20,
+    text: 'Food for the pot, keeper. Into your pack with it.',
+  },
+  {
+    id: 'forest-done', on: ['journey:forest-done'], priority: 5, ttl: 40,
+    text: 'Enough for a fire and a meal. Now the camp: follow the path out of the trees, to the flag.',
+  },
+  {
+    id: 'camp', on: ['journey:camp'], priority: 7, unless: 'fire-lit', ttl: 60,
+    text: 'Your people\'s camp. The fire is cold. Lay your firewood in the ring, then wake it with your lighter.',
+    hint: 'Let go of a log over the stones.',
+  },
+  {
+    id: 'grab', on: ['hand-near', 'done:wreck-axe+6'], priority: 8, unless: 'grabbed', ttl: 12,
     text: 'Reach out and close your hand on it, keeper. Open your hand again to let it go.',
     hint: 'Squeeze the grip to hold; release it to let go.',
   },
   // ── First fire ──
   {
-    id: 'lighter', on: ['grab:lighter'], priority: 8, unless: 'fire-lit', ttl: 30,
+    id: 'lighter', on: ['grab:lighter'], priority: 8, unless: 'fire-lit', when: ['at-camp'], ttl: 30,
     // The referent is spoken (a voice-only "hold it down" sounds like "lower it"): the finger, then the lighter's flame.
-    text: 'Keep your finger pressed: its flame lives only while you do. Hold the lighter\'s flame down in the tinder under the logs.',
+    text: 'Keep your finger pressed: its flame lives only while you do. Hold the lighter\'s flame down in the wood in the ring.',
     hint: 'Hold the trigger down to keep it lit.',
   },
   {
-    id: 'lighter-close', on: ['lighter:on+15'], priority: 7, unless: 'fire-lit', ttl: 15,
-    text: 'Closer, keeper. Hold the flame right in the tinder at the heart of the fire, and keep it there.',
+    id: 'lighter-close', on: ['lighter:on+15'], priority: 7, unless: 'fire-lit', when: ['at-camp'], ttl: 15,
+    text: 'Closer, keeper. Hold the flame right in the wood at the heart of the fire, and keep it there.',
     hint: 'Keep the trigger held.',
   },
   {
@@ -150,7 +221,8 @@ export const LINES: readonly GuideLine[] = [
     text: 'There: the first warmth in many nights. Keep it fed. Now eat: meat and a mushroom from your pack, into the pot.',
   },
   {
-    id: 'myth', on: ['done:fire+1.5'], priority: 5, ttl: 120,
+    // On the walk from the wreck (the camp's first fire is the fallback for a skipped journey).
+    id: 'myth', on: ['done:wreck-dawn+5', 'done:fire+1.5'], priority: 5, ttl: 120,
     text: 'I am Prometheus, or what is left of him. I stole fire to give it to everyone. Your people took it from everyone.',
   },
   {
@@ -207,6 +279,11 @@ export const LINES: readonly GuideLine[] = [
     text: 'A spear: thrust it, or throw it and let go. Deer graze in the meadow, down the trail\'s right fork. Go slowly.',
   },
   {
+    // Parts are known from the start (the journal lists them): one line for the first part made.
+    id: 'parts', on: ['crafted:cord', 'crafted:plank', 'crafted:trigger', 'crafted:limb'], priority: 4, ttl: 25,
+    text: 'The bench makes parts as well as tools: cord, planks, a latch, a bow limb. Your journal keeps their shapes.',
+  },
+  {
     id: 'bolts', on: ['crafted:bolts'], priority: 5, ttl: 25,
     text: `Bolts, ${numberWord(BOLTS_PER_BUNDLE)} to a bundle. Touch the bundle to a crossbow or a sentry to load it.`,
   },
@@ -222,9 +299,18 @@ export const LINES: readonly GuideLine[] = [
   },
   // ── Gathering ──
   {
-    // Taught when the axe is first taken up (before the first swing), or at the first chop.
-    id: 'chop', on: ['grab:axe+0.5', 'chop'], priority: 4,
-    text: 'The axe: three strong swings at any trunk shake loose sticks; fallen deadwood gives a log. Split a log on the camp stump for planks.',
+    // The wreck's door taught the swing; this is the first blow on wood.
+    id: 'chop', on: ['chop'], priority: 4,
+    text: 'The axe: a few strong swings fell a standing tree for firewood; it grows back in time. Split logs on the camp stump for planks.',
+  },
+  {
+    id: 'reeds', on: ['harvest:reeds'], priority: 4, ttl: 25,
+    text: 'Reeds. Twist three together at the bench and they become cord. One, bound to a stick with resin, makes a torch.',
+  },
+  {
+    // The kill leaves a carcass, not meat: the axe does the rest (the toast says it too).
+    id: 'butcher', on: ['kill:prey+0.5'], priority: 6, ttl: 30, covers: ['Butcher it with your axe'],
+    text: 'It\'s yours now. Your axe, a few firm blows, and you\'ll have its meat.',
   },
   {
     id: 'harvest', on: ['harvest'], priority: 3,
@@ -232,8 +318,8 @@ export const LINES: readonly GuideLine[] = [
   },
   {
     id: 'pack', on: ['pack:worn'], priority: 4, covers: ['Pack on your back'],
-    text: 'Your pack rides on your back now. Reach over your shoulder to take it down; let it go low, and it unrolls.',
-    hint: 'Squeeze the grip behind your shoulder.',
+    text: 'Your pack rides on your back now. Reach over your shoulder for it and open it in your hand; let go, and it returns.',
+    hint: 'Grip behind your shoulder; trigger opens it.',
   },
   // ── Night and danger (spoken in the calm, never mid-fight) ──
   {
@@ -342,7 +428,7 @@ export const GUIDE_THRESHOLDS = {
 } as const;
 
 /** Wood that chopping yields; its 'harvest' events are covered by the chop line. */
-const WOOD = new Set(['log', 'stick', 'plank', 'deadwood']);
+const WOOD = new Set(['log', 'stick', 'plank']);
 const WOLF_CUES = new Set(['howl', 'spawn', 'stalk', 'growl', 'bite']);
 
 /**
@@ -366,7 +452,8 @@ export function triggersOf(event: GameEvent, out: string[] = []): string[] {
     case 'torch-lit': out.push('torch-lit'); break;
     case 'page': if (event.first) out.push('page', `page:${event.index}`); break;
     case 'chop': out.push('chop'); break;
-    case 'harvest': if (!WOOD.has(event.kind)) out.push('harvest'); break;
+    case 'harvest': if (!WOOD.has(event.kind)) out.push('harvest', `harvest:${event.kind}`); break;
+    case 'hit': if (event.killed && (event.species === 'deer' || event.species === 'rabbit')) out.push('kill:prey'); break;
     case 'pack': out.push(`pack:${event.state}`); break;
     case 'phase': out.push(`phase:${event.phase}`); break;
     case 'creature': if (event.species === 'wolf' && WOLF_CUES.has(event.cue)) out.push('wolf'); break;
@@ -377,6 +464,7 @@ export function triggersOf(event: GameEvent, out: string[] = []): string[] {
     case 'crossbow-empty': out.push('crossbow-empty'); break;
     case 'beacon': if (!event.lit && event.progress > 0) out.push('beacon'); break;
     case 'ending-step': out.push(`ending-step:${event.step}`); break;
+    case 'journey': out.push(`journey:${event.step}`); break;
     default: break;
   }
   return out;

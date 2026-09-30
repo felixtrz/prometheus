@@ -2,13 +2,12 @@
 
 **Date:** 2026-09-29.
 
-**How it was verified.** vitexec 0.8 runs each scenario on a fresh page with its own Vite server and headless Chromium. Inside the page, the IWSDK dev plugin's IWER emulator stands in for a Meta Quest 3. Scripts drive the headset and controllers the way a player would: poses, squeeze, trigger, and thumbstick walking. They then read ECS state and bus events to assert the outcome.
+**How it was verified.** vitexec 0.8 runs each scenario inside the IWSDK managed browser's runtime iframe, one after another; each starts on a cleared, reloaded runtime (a new journey). Before iteration 3 the scenarios ran on isolated pages with their own Vite server and Chromium. Inside the page, the IWSDK dev plugin's IWER emulator stands in for a Meta Quest 3. Scripts drive the headset and controllers the way a player would: poses, squeeze, trigger, and thumbstick walking. They then read ECS state and bus events to assert the outcome.
 
 - State writes are limited to logged **fixtures** that set up a situation, such as the clock or fuel. They never set an outcome.
 - Scripts live in `vitexec/*.ts`, and the in-page harness is `vitexec/lib/*.ts`. Runners:
-  - `npm run check`: isolated pages.
+  - `npm run check [scenario…|script.ts]`: the managed browser, over its DevTools port 9333.
   - `npm run check -- --shots <dir>`: evidence screenshots.
-  - `npm run check:managed -- <script> [--fresh]`: runs inside the IWSDK managed browser, over its DevTools port 9333.
 
 ## Result
 

@@ -1,18 +1,19 @@
 import {
-  AdditiveBlending, BoxGeometry, BufferGeometry, CircleGeometry, createSystem, CylinderGeometry, DataTexture, Entity, Group, InstancedMesh,
-  LinearFilter, Material, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PointLight, PointLightComponent, Quaternion,
+  AdditiveBlending, BoxGeometry, CircleGeometry, createSystem, CylinderGeometry, DataTexture, Entity, Group, InstancedMesh,
+  LinearFilter, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PointLight, PointLightComponent, Quaternion,
   RGBAFormat, ShaderMaterial, Vector3,
 } from '@iwsdk/core';
 import { bus } from '../bus.js';
 import { Beacon, Campfire, FireVisual, GameState, Held, Item, Page } from '../components.js';
-import { BURSTS, ParticlePool, type Burst } from '../fx-particles.js';
+import { ITEMS } from '../catalog.js';
+import { beckonRank, BECKON_STEPS, BURSTS, ParticlePool, type BeckonState, type Burst } from '../fx-particles.js';
 import { CAMP, nightness, phaseAt } from '../rules.js';
 import { currentObjective, objectiveIndex, OBJECTIVES } from '../story.js';
 import { LANDMARKS, smooth } from '../terrain.js';
 import { BackpackSystem } from './backpack-system.js';
 
-const TORCH_TIP = new Vector3(0, .32, 0);
-const LIGHTER_TIP = new Vector3(0, .07, 0);
+const TORCH_TIP = new Vector3(...ITEMS.torch.tip);
+const LIGHTER_TIP = new Vector3(...ITEMS.lighter.tip);
 const POT_SURFACE = new Vector3(CAMP.pot.x, CAMP.pot.y + .05, CAMP.pot.z);
 const BROTH: Record<string, number> = {
   empty: 0x3b4a4c, meat: 0x6a3a22, mushroom: 0x6b5a3a, berries: 0x6d2438, herb: 0x4f6a2e, ready: 0xa95620,
@@ -28,15 +29,19 @@ const GLINTS = new Set(['glint', 'sparkle', 'beckon']);
 /** Loose items within this range sparkle now and then, so you can tell what can be picked up (m). */
 const SPARKLE_RANGE = 3;
 /**
- * The current task's key items: while one waits in the unrolled pack it beckons (a brighter
- * sparkle, every ~2 s, from across camp). Other packed items never sparkle.
+ * At most one item beckons at a time (a brighter sparkle, every ~2 s, from across camp): the
+ * lowest `beckonRank` of the current task's steps and page 1. Other packed items never sparkle.
  */
-const KEY_ITEMS: Readonly<Record<string, readonly string[]>> = {
-  'light-fire': ['lighter'], 'eat-meal': ['meat', 'mushroom'], torch: ['cloth', 'resin'],
-};
-const NO_KEYS: readonly string[] = [];
 const KEY_RANGE = 7;
+/** How often the beckoning item is chosen again (s). */
+const BECKON_PICK_SECONDS = .25;
 const LIGHT_FIRE_BIT = 1 << objectiveIndex('light-fire');
+const EAT_MEAL_BIT = 1 << objectiveIndex('eat-meal');
+/** Named child each kind's per-frame dressing drives (cached per entity). */
+const DRESSING_PART: Readonly<Record<string, string>> = { torch: 'torch-flame', lighter: 'flame', crossbow: 'loaded-bolt' };
+/** Spire beacon coal glow at full strength (the echo braziers burn at 0.9). */
+const SPIRE_COAL_GLOW = .7;
+const BRAZIER_COAL_GLOW = .9;
 /** Asset prototypes compiled up front although they only enter the scene later. */
 const WARM_PROTOTYPES = ['torch', 'deer', 'rabbit', 'wolf'];
 /** Forage items waiting at their node glint from further off (m). */
@@ -49,8 +54,6 @@ const DETAIL_CULL = .0035;
 const DETAIL_SHOW = .004;
 /** A mesh on no layer is skipped by every camera (visibility, bounds and grabbing are untouched). */
 const NO_LAYERS = 0;
-/** GLB pines drawn as one instanced draw per mesh (scene asset ids). */
-const INSTANCED_PINES = new Set(['pine-1', 'pine-2']);
 /**
  * The scene's two dynamic point lights (never more, never added or removed at runtime):
  * the campfire's own 'fire-glow', and one roaming flame light ('held-light') that follows
@@ -109,11 +112,14 @@ export class FxSystem extends createSystem({
   private spireLight = new Vector3();
   /** Per-item time of the next sparkle (staggered, 3–4 s apart; ~2 s for a key item). */
   private sparkleAt = new Map<number, number>();
-  /** This frame's key item kinds (KEY_ITEMS of the current task) and whether the note in the pack waits to be read. */
-  private keyKinds: readonly string[] = NO_KEYS;
-  private noteWaiting = false;
-  /** GLB pines are folded into instanced draws once per level load. */
-  private pinesPending = true;
+  /** What the beckon choice reads, and the one item beckoning now (re-chosen every BECKON_PICK_SECONDS). */
+  private beckon: BeckonState = { task: '', potA: '', potB: '', stew: '', placed: 0, mealDone: false, noteWaiting: false, noteStarted: false };
+  private beckoner?: Entity;
+  private beckonTimer = 0;
+  /** Per item: its flame or loaded bolt (DRESSING_PART), found once; null when it has none. */
+  private dressing = new Map<number, Object3D | null>();
+  /** A level (re)load: its shaders are warmed once it has built (see warmPending). */
+  private levelPending = true;
   /** Compile every shader of the level up front (after the level's first frame, and on entering XR). */
   private warmPending = false;
   private warmOnPresent = false;
@@ -129,7 +135,6 @@ export class FxSystem extends createSystem({
   /** Scene searches for objects a level may lack (the spire eye, the lantern): at most once a second. */
   private eyeSearchAt = 0;
   private lanternSearchAt = 0;
-  private matrix = new Matrix4();
   /** Item detail culling: bounding radius, meshes and their layer masks, and whether culled. */
   private detail = new Map<number, { radius: number; meshes: Mesh[]; masks: number[]; culled: boolean }>();
   private detailTimer = 0;
@@ -139,7 +144,10 @@ export class FxSystem extends createSystem({
   private puffs!: ParticlePool;
   private smokePool!: ParticlePool;
   private glints!: ParticlePool;
-  private spireEye?: { object: Object3D; material?: Material & { opacity: number } };
+  private spireEye?: {
+    object: Object3D; material?: Material & { opacity: number; emissiveIntensity?: number }; glow: number;
+    halo?: MeshBasicMaterial; haloOpacity: number;
+  };
   private lantern?: MeshBasicMaterial;
   private eyeRamp = -1;
   private smokeShown = false;
@@ -199,10 +207,13 @@ export class FxSystem extends createSystem({
         this.bowlMaterials.delete(entity.index);
         this.sparkleAt.delete(entity.index);
         this.detail.delete(entity.index);
+        this.dressing.delete(entity.index);
+        if (this.beckoner === entity) this.beckoner = undefined;
       }),
       this.world.activeLevel.subscribe((level) => {
-        // The spire eye's clone belongs to the level that is leaving.
+        // The spire eye's clones belong to the level that is leaving.
         this.spireEye?.material?.dispose();
+        this.spireEye?.halo?.dispose();
         this.level = level ?? undefined;
         this.heldLight = undefined;
         this.smoke = undefined;
@@ -212,7 +223,7 @@ export class FxSystem extends createSystem({
         this.eyeSearchAt = this.lanternSearchAt = 0;
         this.eyeRamp = -1;
         this.smokeShown = false;
-        this.pinesPending = true;
+        this.levelPending = true;
       }),
       bus.on('strike', (e) => (e.valid ? burstAt('sparks', e.x, e.y + .02, e.z) : burstAt('dust', e.x, e.y + .02, e.z))),
       // A knock on a tree still shows a few chips; other thuds kick up dust.
@@ -232,6 +243,9 @@ export class FxSystem extends createSystem({
       }),
       bus.on('hit', (e) => burstAt(e.species === 'wolf' ? 'flare' : 'dust', e.x, e.y, e.z)),
       bus.on('brazier-lit', (e) => burstAt('ignite', e.x, e.y + .8, e.z)),
+      bus.on('guide', (e) => { if (e.id === 'note') this.beckon.noteStarted = true; }),
+      bus.on('new-game', () => { this.beckon.noteStarted = false; }),
+      bus.on('journey-begin', () => { this.beckon.noteStarted = false; }),
       bus.on('ending-step', (e) => {
         if (e.step === 'spire-eye') this.eyeRamp = 0;
         if (e.step === 'smoke') this.smokeShown = true;
@@ -240,6 +254,7 @@ export class FxSystem extends createSystem({
         for (const list of this.clones.values()) for (const material of list) material.dispose();
         this.clones.clear();
         this.spireEye?.material?.dispose();
+        this.spireEye?.halo?.dispose();
         // The probe's own stand-ins (never the instantiated prototypes' shared resources).
         for (const child of this.warmProbe?.children ?? []) {
           if (child.userData.warmStandIn) {
@@ -274,7 +289,7 @@ export class FxSystem extends createSystem({
 
   /**
    * Compile every program the level can draw before it is first needed (flames, beacon, spire
-   * eye, lost-pack beam, instanced pines, hidden items; compileAsync walks hidden objects too),
+   * eye, lost-pack beam, the forest's trees, hidden items; compileAsync walks hidden objects too),
    * plus a probe for looks that only appear later: a crafted torch, the creatures, and a
    * deployed sentry's lamp, glow and bolt tips. Inside an XR frame this compiles the
    * headset's (multiview) variants.
@@ -360,48 +375,6 @@ export class FxSystem extends createSystem({
     this.beaconParts.set(entity.index, { flame, glow, halo, haloMaterial, flames, spire: entity.getValue(Beacon, 'role') === 'spire' });
   }
 
-  /**
-   * Draw every GLB pine of the level as one instanced draw per source mesh (bark, needles):
-   * 14 trees cost 4 draws instead of 28. The authored nodes stay (their transforms feed the
-   * instances and the tree index); only their meshes stop drawing themselves.
-   */
-  private instancePines(): void {
-    const level = this.world.activeLevel.peek();
-    const root = level?.object3D;
-    if (!level || !root) return;
-    root.updateMatrixWorld(true);
-    const inverse = new Matrix4().copy(root.matrixWorld).invert();
-    const sources = new Map<string, { geometry: BufferGeometry; material: Material; meshes: Mesh[] }>();
-    root.traverse((object) => {
-      const asset = object.userData.iwsdkSceneAssetId as string | undefined;
-      if (!asset || !INSTANCED_PINES.has(asset)) return;
-      let part = 0;
-      object.traverse((child) => {
-        const mesh = child as Mesh;
-        if (!mesh.isMesh || (mesh as InstancedMesh).isInstancedMesh || Array.isArray(mesh.material)) return;
-        const key = `${asset}/${part++}`;
-        let source = sources.get(key);
-        if (!source) sources.set(key, source = { geometry: mesh.geometry, material: mesh.material as Material, meshes: [] });
-        source.meshes.push(mesh);
-      });
-    });
-    for (const [key, { geometry, material, meshes }] of sources) {
-      if (meshes.length < 2) continue;
-      const instanced = new InstancedMesh(geometry, material, meshes.length);
-      instanced.name = `Instanced ${key}`;
-      meshes.forEach((mesh, i) => {
-        instanced.setMatrixAt(i, this.matrix.multiplyMatrices(inverse, mesh.matrixWorld));
-        mesh.visible = false;
-      });
-      instanced.instanceMatrix.needsUpdate = true;
-      instanced.computeBoundingSphere();
-      instanced.castShadow = instanced.receiveShadow = false;
-      instanced.pointerEvents = 'none';
-      instanced.raycast = () => {};
-      this.world.createTransformEntity(instanced, { parent: level });
-    }
-  }
-
   private flicker(flame: Object3D | undefined, phase: number, scale: number): void {
     if (!flame) return;
     flame.scale.set(scale * (1 + .035 * Math.sin(this.elapsed * 11 + phase)), scale * (1 + .075 * Math.sin(this.elapsed * 9 + phase)), scale);
@@ -420,16 +393,19 @@ export class FxSystem extends createSystem({
   update(delta: number): void {
     const dt = Math.min(delta, .05);
     this.elapsed += dt;
-    if (this.pinesPending && this.world.activeLevel.peek()) {
-      this.pinesPending = false;
-      this.instancePines();
+    if (this.levelPending && this.world.activeLevel.peek()) {
+      this.levelPending = false;
       this.warmPending = true;
     }
     let game: Entity | undefined;
     for (const entity of this.queries.game.entities) { game = entity; break; }
     const night = game ? nightness(game.getValue(GameState, 'clock') ?? 0) : 0;
     this.camera.getWorldPosition(this.viewer);
-    this.updateKeys(game);
+    this.beckonTimer -= dt;
+    if (this.beckonTimer <= 0) {
+      this.beckonTimer = BECKON_PICK_SECONDS;
+      this.pickBeckoner(game);
+    }
     this.updateCampfire(night, dt);
     this.updateBeacons(dt);
     this.updateItems(dt);
@@ -454,7 +430,7 @@ export class FxSystem extends createSystem({
         (this.beam.material as MeshBasicMaterial).opacity = .25 + .1 * Math.sin(this.elapsed * 2.4);
       }
     }
-    // Once the level's first frame has built everything (instanced pines, the spire eye's
+    // Once the level's first frame has built everything (the forest's trees, the spire eye's
     // clone), and again inside the first XR frame after entering the headset.
     const presenting = this.renderer.xr.isPresenting;
     if (this.warmPending || (this.warmOnPresent && presenting)) {
@@ -464,23 +440,49 @@ export class FxSystem extends createSystem({
     }
   }
 
-  /** The current task's key item kinds, and whether the note (page 1, in the pack) waits to be read. */
-  private updateKeys(game: Entity | undefined): void {
-    if (!game) {
-      this.keyKinds = NO_KEYS;
-      this.noteWaiting = false;
-      return;
-    }
+  /** Choose the one item that beckons: the lowest beckonRank among visible items (none when all rank -1). */
+  private pickBeckoner(game: Entity | undefined): void {
+    this.beckoner = undefined;
+    if (!game) return;
+    const state = this.beckon;
     const mask = game.getValue(GameState, 'objectives') ?? 0;
     const index = currentObjective(mask, phaseAt(game.getValue(GameState, 'clock') ?? 0));
-    this.keyKinds = index >= 0 ? KEY_ITEMS[OBJECTIVES[index].id] ?? NO_KEYS : NO_KEYS;
-    // The shade's 'note' line points at it once the first fire burns.
-    this.noteWaiting = (mask & LIGHT_FIRE_BIT) !== 0 && ((game.getValue(GameState, 'pages') ?? 0) & 1) === 0;
+    state.task = index >= 0 ? OBJECTIVES[index].id : '';
+    state.mealDone = (mask & EAT_MEAL_BIT) !== 0;
+    // The shade's 'note' line points at page 1 once the first fire burns.
+    state.noteWaiting = (mask & LIGHT_FIRE_BIT) !== 0 && ((game.getValue(GameState, 'pages') ?? 0) & 1) === 0;
+    const fire = this.fireEntity?.active ? this.fireEntity : undefined;
+    state.potA = fire?.getValue(Campfire, 'potA') ?? '';
+    state.potB = fire?.getValue(Campfire, 'potB') ?? '';
+    state.stew = fire?.getValue(Campfire, 'stew') ?? '';
+    const steps = BECKON_STEPS[state.task];
+    state.placed = 0;
+    if (steps) {
+      for (const entity of this.queries.items.entities) {
+        if (!(entity.getValue(Item, 'slot') ?? '').startsWith('bay-')) continue;
+        const step = steps.indexOf(entity.getValue(Item, 'kind') ?? '');
+        if (step >= 0) state.placed |= 1 << step;
+      }
+    }
+    if (!steps && !state.noteWaiting) return;
+    let best = Infinity;
+    for (const entity of this.queries.items.entities) {
+      if (!entity.object3D?.visible || entity.hasComponent(Held)) continue;
+      const kind = entity.getValue(Item, 'kind') ?? '';
+      const page = kind === 'page' && entity.hasComponent(Page) ? entity.getValue(Page, 'index') ?? 0 : 0;
+      const rank = beckonRank(state, kind, entity.getValue(Item, 'slot') ?? '', entity.getValue(Item, 'variant') ?? '', page);
+      if (rank >= 0 && rank < best) { best = rank; this.beckoner = entity; }
+    }
   }
 
-  private isKey(entity: Entity, kind: string): boolean {
-    if (this.keyKinds.includes(kind)) return true;
-    return kind === 'page' && this.noteWaiting && entity.hasComponent(Page) && entity.getValue(Page, 'index') === 1;
+  /** An item's named flame or loaded bolt (DRESSING_PART), looked up once per entity. */
+  private dressingOf(entity: Entity, object: Object3D, kind: string): Object3D | undefined {
+    let part = this.dressing.get(entity.index);
+    if (part === undefined) {
+      part = object.getObjectByName(DRESSING_PART[kind]) ?? null;
+      this.dressing.set(entity.index, part);
+    }
+    return part ?? undefined;
   }
 
   private updateCampfire(night: number, dt: number): void {
@@ -558,7 +560,7 @@ export class FxSystem extends createSystem({
       const object = entity.object3D;
       if (!object) continue;
       if (kind === 'torch') {
-        const flame = object.getObjectByName('torch-flame');
+        const flame = this.dressingOf(entity, object, kind);
         const lit = entity.getValue(Item, 'lit') === true;
         if (flame) {
           flame.visible = lit && object.visible;
@@ -578,7 +580,7 @@ export class FxSystem extends createSystem({
         continue;
       }
       if (kind === 'lighter') {
-        const flame = object.getObjectByName('flame');
+        const flame = this.dressingOf(entity, object, kind);
         const lit = entity.getValue(Item, 'lit') === true;
         if (flame) {
           flame.visible = lit;
@@ -593,7 +595,7 @@ export class FxSystem extends createSystem({
       } else if (kind === 'bowl') {
         this.tintBowl(entity, object);
       } else if (kind === 'crossbow') {
-        const loaded = object.getObjectByName('loaded-bolt');
+        const loaded = this.dressingOf(entity, object, kind);
         if (loaded) loaded.visible = (entity.getValue(Item, 'charges') ?? 0) > 0;
       }
       this.sparkle(entity, object, glint);
@@ -656,7 +658,7 @@ export class FxSystem extends createSystem({
       if (glint && distance < NODE_GLINT_RANGE && Math.random() < .25) this.burst('glint', this.at.set(p[12], p[13] + .08, p[14]));
       return;
     }
-    const key = slot.startsWith('pack-') && this.isKey(entity, entity.getValue(Item, 'kind') ?? '');
+    const key = entity === this.beckoner;
     if ((slot !== '' && !key) || distance > (key ? KEY_RANGE : SPARKLE_RANGE)) return;
     const due = this.sparkleAt.get(entity.index);
     if (due === undefined) {
@@ -743,9 +745,13 @@ export class FxSystem extends createSystem({
         }
       }
       if (parts.glow) {
-        // Only the charcoal lumps carry this material: embers between charred sticks.
+        // Only the charcoal lumps carry this material: embers between charred sticks. Two
+        // incommensurate beats flicker the bed; scrolling the ramp's V lets each lump breathe.
         parts.glow.emissive.setRGB(1, .42, .1);
-        parts.glow.emissiveIntensity = strength * (.9 + .2 * Math.sin(this.elapsed * 5 + beacon.index));
+        const flicker = 1 + .12 * Math.sin(this.elapsed * 5.3 + beacon.index) + .07 * Math.sin(this.elapsed * 12.7 + beacon.index * 2.1);
+        parts.glow.emissiveIntensity = strength * (parts.spire ? SPIRE_COAL_GLOW : BRAZIER_COAL_GLOW) * flicker;
+        const ramp = parts.glow.emissiveMap;
+        if (ramp && parts.glow.userData.emberBreath) ramp.offset.y = (this.elapsed * .12) % 1;
       }
     }
     this.spireStrength = spireStrength;
@@ -759,15 +765,22 @@ export class FxSystem extends createSystem({
       this.eyeSearchAt = this.elapsed + 1;
       const object = this.world.getActiveRoot().getObjectByName('spire-eye');
       if (object) {
-        let material: (Material & { opacity: number }) | undefined;
+        let material: (Material & { opacity: number; emissiveIntensity?: number }) | undefined;
+        let halo: MeshBasicMaterial | undefined;
         object.traverse((child) => {
-          if (!material && child instanceof Mesh && !Array.isArray(child.material)) {
-            material = child.material.clone() as Material & { opacity: number };
+          if (!(child instanceof Mesh) || Array.isArray(child.material)) return;
+          if (child.name === 'spire-eye-halo') {
+            if (!halo && child.material instanceof MeshBasicMaterial) child.material = halo = child.material.clone();
+            child.raycast = () => {};
+            return;
+          }
+          if (!material) {
+            material = child.material.clone() as Material & { opacity: number; emissiveIntensity?: number };
             material.transparent = true;
             child.material = material;
           }
         });
-        this.spireEye = { object, material };
+        this.spireEye = { object, material, glow: material?.emissiveIntensity ?? 1, halo, haloOpacity: halo?.opacity ?? 0 };
       }
     }
     if (this.spireEye) {
@@ -775,7 +788,15 @@ export class FxSystem extends createSystem({
       if (ended && this.eyeRamp < 0) this.eyeRamp = 2;
       const t = ended ? Math.min(1, (this.eyeRamp += dt) / 2) : 0;
       this.spireEye.object.visible = t > 0;
-      if (this.spireEye.material) this.spireEye.material.opacity = t * (.85 + .15 * Math.sin(this.elapsed * 3));
+      // A slow, noisy flicker (three incommensurate beats), never a steady disc.
+      const e = this.elapsed;
+      const flicker = .5 + .5 * (.5 * Math.sin(e * 1.3) + .3 * Math.sin(e * 2.9 + 1.1) + .2 * Math.sin(e * 5.3 + 2.4));
+      const eye = this.spireEye;
+      if (eye.material) {
+        eye.material.opacity = t * (.9 + .1 * flicker);
+        if (eye.material.emissiveIntensity !== undefined) eye.material.emissiveIntensity = eye.glow * (.8 + .3 * flicker);
+      }
+      if (eye.halo) eye.halo.opacity = t * eye.haloOpacity * (.7 + .45 * flicker);
     }
     this.smoke ??= this.world.getSceneEntity('ending-smoke');
     const smoke = this.smoke?.object3D;

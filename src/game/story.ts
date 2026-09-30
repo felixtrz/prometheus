@@ -19,14 +19,14 @@ export const PAGES: readonly PageInfo[] = [
     index: 2, title: 'Expedition orders', author: 'Dr. Ilse Varga, 1st day', teaches: 'spear', where: 'at the camp bench',
     body: 'The Spire on the ridge above camp holds the valley\u2019s first fire. It burned in that pierced stone '
       + 'before the pines grew. Prometheus is simple: carry one spark home in the lantern, and learn what '
-      + 'it is. Tonight our keeper lit camp from a taper held to the stone. Resin and deadwood: the grove, '
+      + 'it is. Tonight our keeper lit camp from a taper held to the stone. Resin and timber: the grove, '
       + 'left fork. Flint and reeds: the brook, right fork. Deer: the meadow. Spears for everyone. Nobody goes past '
       + 'the outpost alone.',
   },
   {
     index: 3, title: 'Grove notes', author: 'Rennick, 2nd day', where: 'on the grove stump',
     body: 'Old pines weep resin when the sun\u2019s on them. Pull the amber blisters; they come away clean. '
-      + 'Deadwood splits in three good swings, and a log on the stump splits into planks. I lit a brazier '
+      + 'A pine comes down in five good swings and grows back by the season; a log on the stump splits into planks. I lit a brazier '
       + 'here to see by. Odd thing: the cold ones came the night we first carried torches out of camp. '
       + 'Grey shapes at the edge of the light, eyes like coals. They wouldn\u2019t cross into the glow. '
       + 'Just watched. Like they wanted it back.',
@@ -48,7 +48,7 @@ export const PAGES: readonly PageInfo[] = [
   {
     index: 6, title: 'The sentry', author: 'Rennick, 10th day', teaches: 'sentry-kit', where: 'below the lookout',
     body: 'No fire left but the keeper\u2019s lighter, and still the Hollow circle camp. So: a sentry. A '
-      + 'trigger and a spring on a plank frame; it turns and looses on its own and watches while we sleep. '
+      + 'carved latch and a bow limb lashed to a log; it turns and looses on its own and watches while we sleep. '
       + 'Mine held until the bolts ran out. I\u2019m taking the others back the way we came, while they '
       + 'still follow me. Ilse stays with the keeper. Keep it loaded. Keep it near the fire.',
   },
@@ -69,29 +69,31 @@ export const PAGES: readonly PageInfo[] = [
  * the main trail leaves camp past the fire and climbs to the outpost and on to the
  * stone spire on the ridge; its first fork (left) runs to the grove, its second
  * (right) runs downhill through the meadow to the brook.
- * Sources, as placed in the valley: loose sticks around camp (or three axe swings at
- * any trunk); resin on the grove pines (left fork); flint and reeds (cord) at the
- * brook (right fork, past the meadow); planks from a log split on the camp stump, or
- * salvage in the outpost crate; the trigger and spring in the outpost crate; a second
- * trigger at the outpost's lookout; cloth in your pack, or the outpost's torn tent canvas.
+ * Nothing finished lies in the valley: only raw materials are gathered, and every part
+ * is made at the bench (BENCH_RECIPES). Sources, as placed in the valley: loose sticks
+ * around camp (or from felling a tree); reeds by camp and at the brook; resin
+ * in your pack, on a pine by camp and on the grove pines (left fork); flint at the brook
+ * (right fork, past the meadow); firewood logs from felling any tree.
+ * Parts: cord (three reeds), plank (two sticks and resin, or a log split on the camp
+ * stump), trigger latch (plank, stick, flint), bow limb (stick, cord, resin).
  */
 export type ObjectiveInfo = { id: string; title: string; hint: string; wrist: string };
 
 export const OBJECTIVES: readonly ObjectiveInfo[] = [
   {
     id: 'light-fire', title: 'Light the campfire',
-    hint: 'Take the lighter from your pack on the table. Hold its trigger down and keep the flame in the tinder under the logs.',
-    wrist: 'Take the lighter; hold its trigger, flame in the logs.',
+    hint: 'Lay a log in the cold fire ring. Take the lighter from your hip, hold its trigger down and keep the flame in the wood.',
+    wrist: 'Log in the ring; lighter from your hip, trigger held.',
   },
   {
     id: 'eat-meal', title: 'Cook a meal and eat it',
-    hint: 'Meat and a mushroom from your pack into the pot. Stir with the spoon, dip the bowl, bring it to your mouth.',
+    hint: 'The meat from your pack (trigger opens it) and a mushroom into the pot. Stir with the spoon, dip the bowl, drink.',
     wrist: 'Meat and mushroom in the pot; stir, dip the bowl, drink.',
   },
   {
     id: 'torch', title: 'Craft a torch and light it',
-    hint: 'Stick, cloth, resin in the bench bays; hammer the pad three times. Sticks lie around camp; resin: grove pines, left fork.',
-    wrist: 'Stick, cloth, resin in the bays; hammer the pad 3 times.',
+    hint: 'Stick, reeds, resin in the bench bays; strike the pad three times. Sticks and reeds: around camp. Resin: grove pines, left fork.',
+    wrist: 'Stick, reeds, resin in the bays; hammer the pad 3 times.',
   },
   {
     id: 'sleep', title: 'Survive the night, then sleep',
@@ -100,40 +102,64 @@ export const OBJECTIVES: readonly ObjectiveInfo[] = [
   },
   {
     id: 'spear', title: 'Craft a spear',
-    hint: 'Stick, flint and cord at the bench. Take the trail\'s right fork downhill past the meadow to the brook: flint, and reeds for cord.',
-    wrist: 'Stick, flint, cord. Flint, reeds: brook, past the meadow.',
+    hint: 'Stick, flint, cord at the bench; twist three reeds into cord there. Flint: the trail\'s right fork, past the meadow, at the brook.',
+    wrist: 'Stick, flint, cord (3 reeds). Flint: brook, past the meadow.',
   },
   {
     id: 'hunt', title: 'Hunt for meat',
-    hint: 'Take the trail\'s right fork down to the meadow. Walk slowly toward a deer; thrust or throw the spear.',
-    wrist: 'Right fork to the meadow; walk slowly, spear a deer.',
+    hint: 'Take the right fork down to the meadow. Walk slowly toward a deer; thrust or throw the spear, then butcher it with your axe.',
+    wrist: 'Right fork to the meadow; spear a deer, butcher it with the axe.',
   },
   {
-    id: 'outpost', title: 'Find the expedition outpost',
-    hint: 'Stay on the main trail, uphill past both forks, toward the stone spire. The team left notes at the outpost.',
-    wrist: 'Main trail uphill, past both forks, to the outpost.',
+    id: 'outpost', title: 'Find the high outpost',
+    hint: 'Stay on the main trail, uphill past both forks, toward the stone spire. The team left notes at the high outpost.',
+    wrist: 'Main trail uphill, past both forks, to the high outpost.',
   },
   {
     id: 'crossbow', title: 'Craft the crossbow',
-    hint: 'Plank, cord and trigger. Trigger and planks: the outpost crate. Or split a log on the camp stump for a plank.',
-    wrist: 'Plank, cord, trigger (outpost crate). Plank: split a log.',
+    hint: 'Plank, bow limb, trigger latch. Limb: stick, cord, resin. Latch: plank, stick, flint. Plank: split a log on the camp stump.',
+    wrist: 'Plank, bow limb, latch. Your journal lists every part.',
   },
   {
     id: 'sentry', title: 'Build a sentry for camp',
-    hint: 'Bench: trigger, spring and plank. Spring: the outpost crate; a second trigger lies at the lookout. Set the kit by the fire.',
-    wrist: 'Bench: trigger, spring, plank. Spring: crate; trigger: lookout.',
+    hint: 'Bench: a log, a bow limb and a trigger latch, made as for the crossbow. Set the kit down low by the fire.',
+    wrist: 'Bench: log, bow limb, latch. Set the kit by the fire.',
   },
   {
     id: 'beacon', title: 'Carry fire to the Spire',
     hint: 'Carry a lit torch up the trail, past the outpost, to the stone spire. Hold it in the beacon. Bring something for your other hand.',
     wrist: 'Lit torch into the Spire\'s beacon; fight with the other hand.',
   },
+  // The opening journey (design/JOURNEY.md). Appended so the older bits keep their meaning
+  // (saves, tests); OBJECTIVE_ORDER puts them first everywhere they are shown.
+  {
+    id: 'escape', title: 'Get out of the wreck',
+    hint: 'Walk to the door at the front. The emergency axe hangs above it: take it and strike the door until it gives.',
+    wrist: 'Axe above the door; strike the door till it gives.',
+  },
+  {
+    id: 'waystation', title: 'Find your pack at the waystation',
+    hint: 'Follow the trail and the orange markers from the wreck. Your pack lies on the waystation table: put it on your back.',
+    wrist: 'Follow the markers; put on the pack from the table.',
+  },
+  {
+    id: 'forest', title: 'Firewood and mushrooms',
+    hint: 'Through the forest to the camp: fell a tree for its logs (five axe blows) and pick mushrooms on the way.',
+    wrist: 'Fell a tree for logs; pick mushrooms on the way.',
+  },
 ];
+
+/** Objective bit indices in the order they are pursued and shown (the journey's three first). */
+export const OBJECTIVE_ORDER: readonly number[] = [10, 11, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+/** The journey's objectives as one mask (see save.ts: older saves count them done). */
+export const JOURNEY_MASK = (1 << 10) | (1 << 11) | (1 << 12);
+/** 1-based position of an objective in OBJECTIVE_ORDER ("2 OF 13"). */
+export const objectiveRank = (index: number) => OBJECTIVE_ORDER.indexOf(index) + 1;
 
 /** First words of a fresh journey, shown when the player first sees the world. */
 export const OPENING = {
-  title: 'You wake beside a cold fire.',
-  body: 'You don\u2019t remember lying down. There\u2019s a note in your pack, in your handwriting.',
+  title: 'You wake to smoke and red light.',
+  body: 'The plane is down, and burning. Get out.',
 };
 
 /**
@@ -151,7 +177,7 @@ export const START = {
   ],
   /** Continue's first line and New journey's second line. */
   continue: 'Continue',
-  fresh: 'Wake beside the cold fire',
+  fresh: 'Wake in the wreck',
   confirm: 'Erase your saved journey?',
   confirmBody: 'Choose again to start over',
 };
@@ -180,7 +206,7 @@ export const WOLVES_BY_STAGE = [0, 1, 3, 5] as const;
  */
 export function currentObjective(mask: number, phase?: string): number {
   const sleep = objectiveIndex('sleep');
-  for (let i = 0; i < OBJECTIVES.length; i++) {
+  for (const i of OBJECTIVE_ORDER) {
     if (mask & (1 << i)) continue;
     if (i === sleep && phase === 'day') continue;
     return i;

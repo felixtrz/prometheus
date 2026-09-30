@@ -4,6 +4,7 @@ import {
 import { bus } from '../bus.js';
 import { GameState } from '../components.js';
 import { clearSave, continueLabel, readSave, writeSave } from '../save.js';
+import { type ComfortKey, cycleSetting, onSettings, settingLit, settingText } from '../settings.js';
 import { START } from '../story.js';
 import { CampfireSystem } from './campfire-system.js';
 import { CombatSystem } from './combat-system.js';
@@ -23,10 +24,20 @@ export type StartPhase = 'waiting' | 'starting' | 'running';
 
 type Pausable = { isPaused: boolean; stop(): void; play(): void };
 
-const IDS = [
+/** Comfort chips (the journal board's, reachable before the first step; settings.ts cycleSetting). */
+const COMFORT: readonly { key: ComfortKey; id: string; value: string; name: string }[] = [
+  { key: 'speed', id: 'sm-set-speed', value: 'sm-set-speed-val', name: 'Start Walking Speed Setting' },
+  { key: 'turn', id: 'sm-set-turn', value: 'sm-set-turn-val', name: 'Start Turning Setting' },
+  { key: 'tunnel', id: 'sm-set-tunnel', value: 'sm-set-tunnel-val', name: 'Start Comfort Tunnel Setting' },
+  { key: 'flashes', id: 'sm-set-flashes', value: 'sm-set-flashes-val', name: 'Start Reduce Flashes Setting' },
+  { key: 'subs', id: 'sm-set-subs', value: 'sm-set-subs-val', name: 'Start Subtitles Setting' },
+];
+
+const IDS: readonly string[] = [
   'sm-root', 'sm-name', 'sm-subtitle', 'sm-lead', 'sm-hook', 'sm-continue', 'sm-continue-sub',
   'sm-new', 'sm-new-label', 'sm-new-sub', 'sm-help', 'sm-enter-xr',
-] as const;
+  ...COMFORT.flatMap((c) => [c.id, c.value]),
+];
 
 /** Stable names so XR tests (and players' rays) resolve the exact buttons. */
 export const START_BUTTONS = {
@@ -54,6 +65,8 @@ const QUIET: Style = { backgroundColor: '#1b2621', borderColor: '#667567', hover
 const ARMED: Style = { backgroundColor: '#7c2f22', borderColor: '#c4583f', hover: { backgroundColor: '#8e3627' } };
 const INK_DARK: Style = { color: '#17231e' };
 const INK_LIGHT: Style = { color: '#e6ebdf' };
+const CHIP_LIT: Style = { color: '#e2b57a' };
+const CHIP_OFF: Style = { color: '#8f9d90' };
 const HOOK_LEAD = plain(START.hook[0]);
 const HOOK_BODY = plain(START.hook[1]);
 const HELP_BROWSER = 'Click to choose.';
@@ -61,8 +74,9 @@ const HELP_XR = 'Point and pull the trigger to choose.';
 
 /**
  * The start of every page load: a panel in front of the player's view with the
- * game's name, the story hook (story.ts START / OPENING) and New journey /
- * Continue (Continue only when a save exists, naming its day and progress).
+ * game's name, the story hook (story.ts START / OPENING), New journey /
+ * Continue (Continue only when a save exists, naming its day and progress) and the
+ * COMFORT chips (walk speed, turning, tunnel, reduce flashes, subtitles; settings.ts).
  *
  * Until a choice is made the world holds still: the gameplay systems (items, fire,
  * bench, gathering, combat, creatures, survival, story/autosave) are stopped with
@@ -295,6 +309,10 @@ export class StartSystem extends createSystem({
     bind('sm-continue', START_BUTTONS.continue, this.onContinue);
     bind('sm-new', START_BUTTONS.fresh, this.onNew);
     bind('sm-enter-xr', START_BUTTONS.enterXR, this.onEnterXR);
+    // Comfort before the first step: the same controls as the journal board and the wrist.
+    for (const chip of COMFORT) bind(chip.id, chip.name, () => cycleSetting(chip.key));
+    this.applyComfort();
+    this.cleanupFuncs.push(onSettings(() => this.applyComfort()));
     asset.name = 'Start Panel';
     asset.scale.setScalar(this.config.scale.peek());
     this.entity = this.world.createTransformEntity(asset, { persistent: true });
@@ -345,6 +363,16 @@ export class StartSystem extends createSystem({
     ui.style('sm-new-sub', ink);
     ui.text('sm-new-label', armed ? plain(START.confirm) : 'New journey');
     ui.text('sm-new-sub', armed ? plain(START.confirmBody) : plain(START.fresh));
+  }
+
+  /** Comfort chip values from the live settings. */
+  private applyComfort(): void {
+    const ui = this.ui;
+    if (!ui) return;
+    for (const chip of COMFORT) {
+      ui.text(chip.value, settingText(chip.key));
+      ui.style(chip.value, settingLit(chip.key) ? CHIP_LIT : CHIP_OFF);
+    }
   }
 
   /** Help line and the Enter VR link follow the display mode. */

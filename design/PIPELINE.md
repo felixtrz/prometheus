@@ -23,8 +23,8 @@ intuitiveness, immersion, sound and story. The first-playable pipeline is archiv
 - Slide/HTML preview: Artifact tool + local files
 - Image generation: none → hand-authored SVG
 - iwsdk CLI 0.5.3 · reference: ready · Node 26.4 · ffmpeg available (audio encode)
-- Runtime verify: managed browser connected, browserCommandReady true (port 8081); headless since v3 (`npx iwsdk dev restart --headless`), DevTools port 9333 for vitexec (`npm run check:managed`)
-- Gameplay testing: vitexec 0.8 (`npm run check`, isolated pages; tests/vitexec-run.mjs) driving the IWER emulator in-page
+- Runtime verify: managed browser connected, browserCommandReady true (port 8081); headless since v3 (`npx iwsdk dev restart --headless`), DevTools port 9333 (opened by the `dev:runtime` script) for vitexec
+- Gameplay testing: vitexec 0.8 (`npm run check`, tests/vitexec-run.mjs) inside the one managed browser's runtime iframe, driving the IWER emulator in-page; scenarios run serially, each on a cleared, reloaded runtime
 - Drawcall canvas: CLI credentials rejected (Unauthorized); local GLTS/GDD snapshots used
 
 ## Milestone Log
@@ -97,4 +97,4 @@ intuitiveness, immersion, sound and story. The first-playable pipeline is archiv
   settings unit test, sheet-item hover rim (widened shell + polygon offset).
 - Handoff 2026-09-29: iteration 3 stopped mid-flight by request; partial changes kept (they
   typecheck, 94/94 unit tests). Final `npm run check`: 6/6 PASS, 98 checks (finale with 2/3/5
-  waves: 10 guardians, 8 slain, 1 bite; perf 170 draws / 230k tris). See HANDOFF.md.
+  waves: 10 guardians, 8 slain, 1 bite; perf 170 draws / 230k tris).

@@ -155,3 +155,15 @@ test('the epilogue tally (crafted, slain) round-trips and defaults to 0 in older
   assert.equal(parsed.game.slain, 0);
   assert.equal(save.parseSave(JSON.stringify(sample({ game: { crafted: 'many' } }))), null, 'a malformed tally is no save');
 });
+
+test('saves from before the wreck opening count its three objectives done; new saves are left alone', () => {
+  const escape = 1 << story.objectiveIndex('escape');
+  // An old camp save (fire lit, meal eaten, a spear): the keeper is already past the journey.
+  const old = save.parseSave(JSON.stringify(sample({ game: { objectives: 0b10011 } })));
+  assert.equal(old.game.objectives, 0b10011 | story.JOURNEY_MASK);
+  // A new save mid-journey (out of the wreck, the pack not found yet) keeps its bits.
+  const mid = save.parseSave(JSON.stringify(sample({ game: { objectives: escape } })));
+  assert.equal(mid.game.objectives, escape);
+  // A save with nothing done stays at nothing: that keeper wakes in the wreck.
+  assert.equal(save.parseSave(JSON.stringify(sample({ game: { objectives: 0 } }))).game.objectives, 0);
+});

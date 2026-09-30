@@ -42,68 +42,6 @@ function paintByNormal<T extends BufferGeometry>(geometry: T, side: number, up: 
 const cyl = (top: number, bottom: number, h: number, seg: number, color: number, variation = .05, open = false) =>
   paint(new CylinderGeometry(top, bottom, h, seg, 1, open), color, variation);
 
-// =============================================================================== deadwood
-/**
- * Uprooted fallen trunk (~2.1 m, r ≈ .2) with its root plate torn out of the ground, a
- * snapped crown end, branch stubs, moss, and two fresh axe notches in pale wood: it reads
- * as a tree you chop, never as loose firewood (the 'log' item is a short sawn billet).
- * Origin at ground centre; the trunk lies along X, root plate at -X.
- */
-function makeDeadwood(): Group {
-  const src = new Group();
-  const length = 2.1, rRoot = .22, rTop = .17, axisY = .19;
-  const trunk = new CylinderGeometry(rRoot, rTop, length, 12, 8, true);
-  const p = trunk.getAttribute('position');
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x);
-    const bump = 1 + .07 * Math.sin(a * 3 + y * 4) + .04 * Math.sin(a * 7 - y * 9);
-    p.setXYZ(i, x * bump, y, z * bump + .03 * Math.sin(y * 1.8));
-  }
-  // CylinderGeometry's +Y (radiusTop) end turns toward -X: that is the root end.
-  trunk.rotateZ(Math.PI / 2);
-  paintByNormal(trunk, 0x6f5d4a, 0x6f8a3a, .62, .08);
-  put(src, trunk, mats.bark, [0, axisY, 0]);
-  // Root plate: a disc of earth and torn roots standing on edge at the root end.
-  const plateX = -length / 2 - .06;
-  put(src, paintByNormal(new IcosahedronGeometry(1, 1), 0x5a4632, 0x6f8a3a, .7, .1), mats.bark, [plateX - .04, .3, 0], [0, 0, 0], [.1, .36, .5]);
-  for (let i = 0; i < 9; i++) {
-    const a = i / 9 * Math.PI * 2 + .3, reach = .38 + (i % 3) * .1;
-    const from = new Vector3(plateX + .02, axisY + Math.sin(a) * .12, Math.cos(a) * .12);
-    const to = new Vector3(plateX - .06 - (i % 2) * .08, Math.min(.62, Math.max(.02, axisY + .12 + Math.sin(a) * reach)), Math.cos(a) * reach * 1.15);
-    span(src, cyl(.012, .04, 1, 5, 0x4f3b2a, .05, true), mats.bark, from, to);
-  }
-  // Snapped crown end: pale heartwood and jagged shards.
-  const endA = new Group();
-  endA.position.set(length / 2, axisY, 0);
-  put(endA, cyl(rTop * .88, rTop * .88, .03, 10, 0xc9a577, .05), mats.bark, [0, 0, 0], [0, 0, Math.PI / 2]);
-  for (let i = 0; i < 7; i++) {
-    const a = i / 7 * Math.PI * 2 + .3, len = .1 + (i % 3) * .06;
-    put(endA, cyl(0, .04, len, 3, i % 2 ? 0xb89466 : 0x8a7054, .04), mats.bark, [len / 2, Math.sin(a) * .11, Math.cos(a) * .11], [0, 0, -Math.PI / 2 + (i % 2 ? .15 : -.1)]);
-  }
-  src.add(endA);
-  // Broken branch stubs with pale snapped tips.
-  for (const [x, a, len, r] of [[.5, .9, .32, .05], [-.05, -1.1, .24, .042], [-.5, .35, .28, .038], [.2, 2.4, .18, .034]] as const) {
-    const base = new Vector3(x, axisY + Math.cos(a) * .17, Math.sin(a) * .17);
-    const tip = base.clone().add(new Vector3(len * .35, Math.cos(a) * len, Math.sin(a) * len));
-    span(src, cyl(r * .7, r, 1, 6, 0x6f5d4a, .05, true), mats.bark, base, tip);
-    put(src, cyl(r * .72, r * .72, .012, 6, 0xc9a577, 0), mats.bark, [tip.x, tip.y, tip.z]).quaternion.setFromUnitVectors(new Vector3(0, 1, 0), tip.clone().sub(base).normalize());
-  }
-  // Two fresh axe notches: pale V-cuts in the upper side, with a few chips below.
-  for (const nx of [.12, .62]) {
-    const top = axisY + rRoot - (nx + length / 2) / length * (rRoot - rTop) - .01;
-    for (const side of [-1, 1]) put(src, box3(.09, .012, .2, 0xe0c393), mats.bark, [nx + side * .03, top, .02], [0, 0, side * .62]);
-    put(src, box3(.02, .05, .19, 0x9a6f45), mats.bark, [nx, top - .03, .02]);
-  }
-  for (let i = 0; i < 5; i++) {
-    const a = i * 2.2 + .4;
-    put(src, box3(.045, .006, .022, i % 2 ? 0xd9b88a : 0xc9a577), mats.bark, [.35 + Math.cos(a) * .2, .004, .3 + Math.sin(a) * .1], [0, a * 1.7, 0]);
-  }
-  // Moss cushions on the upper side.
-  for (const [x, z, s] of [[-.4, .06, .18], [.35, -.05, .12], [.85, .04, .09]] as const) {
-    put(src, paint(new IcosahedronGeometry(1, 1), 0x6f9a3c, .12), mats.bark, [x, axisY + rRoot * .92, z], [0, x * 3, 0], [s, s * .32, s * .7]);
-  }
-  return batchStatic(src);
-}
 const box3 = (w: number, h: number, d: number, color: number) => paint(new BoxGeometry(w, h, d), color, .03);
 
 // ============================================================================== resin scar
@@ -765,8 +703,9 @@ function makeBeaconBrazier(): Group {
   const bed: Lump[] = [];
   for (let i = 0; i < 18; i++) {
     const a = i * 2.4 + .3, r = .06 + (i % 5) * .07, size = .042 + (i % 3) * .014;
-    // Heaped toward the middle between the sticks; a third burn through, the rest glow at the seams.
-    bed.push({ x: Math.cos(a) * r, y: bowlBase + .172 + (.34 - r) * .09, z: Math.sin(a) * r, size, tall: .6 + ((i * 7) % 5) * .1, yaw: a * 1.7 + i, hot: i % 3 === 1 });
+    // Heaped toward the middle between the sticks, near-round (y ×~0.9, never coins); a third
+    // burn through, the rest keep a dark crust glowing at the seams.
+    bed.push({ x: Math.cos(a) * r, y: bowlBase + .172 + (.34 - r) * .09, z: Math.sin(a) * r, size, tall: .82 + ((i * 7) % 5) * .04, yaw: a * 1.7 + i, hot: i % 3 === 1 });
   }
   baked(root, body, 'beacon').add(coalBed(bed));
   const flame = new Group();
@@ -1057,7 +996,6 @@ function makeEndingSmoke(): Group {
   return root;
 }
 
-export const deadwood = makeDeadwood();
 export const resinScar = makeResinScar();
 export const mushroomPatch = makeMushroomPatch();
 export const berryBush = makeBerryBush();

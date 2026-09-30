@@ -8,9 +8,10 @@ import { guideAssets } from './game/guide-assets.js';
 import { creatureAssets } from './scene-assets/creatures.scene-asset.js';
 import { supplyStand, strikingPad } from './scene-assets/camp-stage.scene-asset.js';
 import { bedroll, choppingStump, journalBoard } from './scene-assets/camp-dressing.scene-asset.js';
+import { journeyAssets } from './scene-assets/journey-assets.js';
 
 // Each feature module owns one registry record; this file only merges them.
-// Owners: camp (here), items, creatures, valley, audio, ui. See design/ARCHITECTURE.md.
+// Owners: camp (here), items, creatures, valley, audio, ui, journey (the wreck and waystation). See design/ARCHITECTURE.md.
 const campAssets = {
   campfire, bench, backpack,
   'supply-stand': supplyStand, 'striking-pad': strikingPad,
@@ -25,4 +26,5 @@ export default defineAssets({
   ...audioAssets,
   ...uiAssets,
   ...guideAssets,
+  ...journeyAssets,
 });

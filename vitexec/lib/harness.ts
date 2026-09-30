@@ -10,13 +10,24 @@
  * State writes are reserved for fixtures (skipping the clock to night, topping up
  * fuel) and are logged as such. Outcomes are never written, only observed.
  *
+ * Sections are blocks: `if (await section('…')) { … }`. A full run leaves a checkpoint
+ * at each (the game's own save, the rig and head pose, what each hand holds); a
+ * resumed run (`npm run check -- expedition@S11`) continues that save and skips every
+ * section before the chosen one. So a section re-finds what it needs by query rather
+ * than reading an earlier section's variables.
+ *
  * Scripts import this module by its absolute URL: `/vitexec/lib/harness.ts`.
  */
-import { Matrix4, Quaternion, Vector3 } from '@iwsdk/core';
+import { LocomotionSystem, Matrix4, Quaternion, Vector3 } from '@iwsdk/core';
 import type { Entity, World } from '@iwsdk/core';
 import { bus, type GameEvent } from '/src/game/bus.ts';
+import { packIndex } from '/src/game/carry.ts';
 import { GameState, Held, Item } from '/src/game/components.ts';
+import { SAVE_KEY } from '/src/game/save.ts';
+import { BackpackSystem } from '/src/game/systems/backpack-system.ts';
+import { HolsterSystem } from '/src/game/systems/holster-system.ts';
 import { ItemSystem } from '/src/game/systems/item-system.ts';
+import { StorySystem } from '/src/game/systems/story-system.ts';
 
 export type V3 = readonly [number, number, number];
 export type Q4 = readonly [number, number, number, number];
@@ -59,8 +70,72 @@ export async function until(check: () => boolean, ms: number, what: string): Pro
 let checks = 0;
 const started = performance.now();
 
-export function section(title: string): void {
+/** A section start in a full run, and where a resumed run picks up (tests/vitexec-run.mjs stores them). */
+export type Checkpoint = {
+  title: string;
+  /** The game's save and its localStorage key (the runner seeds it before a resume). */
+  save: string;
+  saveKey: string;
+  rig: { p: V3; q: Q4 };
+  head: { p: V3; q: Q4 };
+  held: Partial<Record<Hand, string>>;
+};
+/** sessionStorage key the runner sets for a resumed run (read once, at boot). */
+const RESUME_KEY = 'vitexec.resume';
+let resume: Checkpoint | undefined;
+
+/** A resumed run starts through Continue on the start panel (see journey.ts). */
+export const resuming = () => resume !== undefined;
+
+/**
+ * Start a section; false while a resumed run skips ahead to its checkpoint. On the
+ * checkpoint's own section it restores the pose and the held items, then runs on.
+ */
+export async function section(title: string): Promise<boolean> {
+  if (resume && title !== resume.title) {
+    console.log(`${title} (skipped)`);
+    return false;
+  }
   console.log(`${title}`);
+  if (resume) {
+    await restore(resume);
+    resume = undefined;
+    return true;
+  }
+  const store = (window as unknown as { __vitexecCheckpoint?: (checkpoint: string) => Promise<void> }).__vitexecCheckpoint;
+  if (store) await store(JSON.stringify(checkpoint(title)));
+  return true;
+}
+
+function checkpoint(title: string): Checkpoint | null {
+  world.getSystem(StorySystem)?.saveNow();
+  const save = localStorage.getItem(SAVE_KEY);
+  if (!save) return null; // no journey begun yet
+  const player = rig();
+  const held: Partial<Record<Hand, string>> = {};
+  for (const it of items((i) => i.held)) {
+    const hand = holder(it.entity);
+    if (hand) held[hand] = it.uid;
+  }
+  const q4 = (q: { x: number; y: number; z: number; w: number }): Q4 => [q.x, q.y, q.z, q.w];
+  return {
+    title, save, saveKey: SAVE_KEY, held,
+    rig: { p: [player.position.x, player.position.y, player.position.z], q: q4(player.quaternion) },
+    head: { p: [xr.position.x, xr.position.y, xr.position.z], q: q4(xr.quaternion) },
+  };
+}
+
+async function restore(point: Checkpoint): Promise<void> {
+  world.getSystem(LocomotionSystem)?.setPlayerPosition(new Vector3(...point.rig.p));
+  world.player.quaternion.set(...point.rig.q);
+  xr.position.set(...point.head.p);
+  xr.quaternion.set(...point.head.q);
+  await sleep(300);
+  for (const [hand, uid] of Object.entries(point.held) as [Hand, string][]) {
+    await until(() => items((i) => i.uid === uid).length > 0, 10_000, `held item ${uid} to be restored`);
+    await grab((i) => i.uid === uid, hand, `held ${uid}`);
+  }
+  note(`resumed at "${point.title}"`);
 }
 
 export function check(condition: unknown, message: string): void {
@@ -87,6 +162,7 @@ export async function shot(name: string): Promise<void> {
 }
 
 export function done(name: string): void {
+  if (resume) throw new Error(`no section "${resume.title}" in ${name}`);
   console.log(`${name}: PASS (${checks} checks, ${((performance.now() - started) / 1000).toFixed(0)} s)`);
 }
 
@@ -104,6 +180,9 @@ export async function boot(): Promise<void> {
   xr = host.IWER_DEVICE;
   await until(() => all(GameState).length > 0 && all(Item).length > 10, 60_000, 'the level to load');
   bus.onAny((event) => events.push(event));
+  const pending = sessionStorage.getItem(RESUME_KEY);
+  sessionStorage.removeItem(RESUME_KEY);
+  resume = pending ? JSON.parse(pending) as Checkpoint : undefined;
 }
 
 /** Accept the app's session offer (iwsdk.config.json `xr.offer: once`), as a player would. */
@@ -242,7 +321,18 @@ export async function approach(point: V3 | Vector3, distance = .7, options: { sp
   const dx = at.x - px, dz = at.z - pz;
   const length = Math.hypot(dx, dz) || 1;
   if (length > distance + .25) {
-    await locomote([px + dx / length * distance, pz + dz / length * distance], { tolerance: .2, ...options });
+    // Straight in first; blocked (a stump, a trunk, the bench), walk round to another side.
+    const from = Math.atan2(dz, dx);
+    for (const turn of [0, .9, -.9, 1.8, -1.8, Math.PI]) {
+      const a = from + turn;
+      try {
+        await locomote([px + Math.cos(a) * distance, pz + Math.sin(a) * distance], { tolerance: .2, ms: 12_000, ...options });
+        break;
+      } catch (error) {
+        if (!/stalled/.test(String(error)) || turn === Math.PI) throw error;
+        note(`approach blocked; walking round (${(turn * 180 / Math.PI).toFixed(0)}°)`);
+      }
+    }
   }
   await look([px, Math.min(py, head().y - .3), pz]);
 }
@@ -411,6 +501,8 @@ export function holder(entity: Entity): Hand | undefined {
  */
 export async function grab(filter: (item: ItemInfo) => boolean, hand: Hand = 'right', what = 'item'): Promise<ItemInfo> {
   const target = item(filter, what);
+  // Stored in the pack: out of sight until the pack is taken off and opened, as a player would.
+  if (packIndex(target.slot) >= 0 && !target.entity.object3D?.visible) return takeFromPack(same(target.entity), hand, what);
   for (let approach = 0; approach < 3; approach++) {
     const p = worldPos(target.entity);
     squeeze(hand, 0);
@@ -422,8 +514,25 @@ export async function grab(filter: (item: ItemInfo) => boolean, hand: Hand = 'ri
       await sleep(160); // the item eases into its hold pose
       return info(target.entity);
     }
+    const wrong = items((i) => i.held && holder(i.entity) === hand)[0];
+    note(`grab ${what}: approach ${approach + 1} missed${wrong ? ` (took ${wrong.kind} from ${wrong.slot || 'the ground'})` : ''}`);
   }
-  throw new Error(`grab failed: ${target.kind} ${target.uid}`);
+  throw new Error(`grab failed: ${target.kind} ${target.uid} (slot '${info(target.entity).slot}'; ${reachReport(hand, target.entity)})`);
+}
+
+/** ItemSystem's view from a hand's grip: reach and centre gap to the target and to every held item. */
+function reachReport(hand: Hand, target: Entity): string {
+  // Diagnostics only: ItemSystem's private reach maths, so the report matches what it chose.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const system = world.getSystem(ItemSystem) as any;
+  const grip = system.gripSpace(hand)?.getWorldPosition(new Vector3());
+  if (!grip) return `no ${hand} grip space`;
+  const entities = [target, ...items((i) => i.held && i.entity !== target).map((i) => i.entity)];
+  return entities.map((entity) => {
+    const reach = system.reachTo(entity, entity.object3D, grip) as number;
+    const it = info(entity);
+    return `${it.kind}${it.held ? ` in ${holder(entity)}` : ''}: reach ${reach.toFixed(3)} centre ${(system.centreGap as number).toFixed(3)}`;
+  }).join('; ');
 }
 
 export async function release(hand: Hand = 'right'): Promise<void> {
@@ -473,4 +582,121 @@ export async function carry(hand: Hand, to: V3, seconds = .5): Promise<void> {
   await move(hand, [from.x, high, from.z], { seconds: .3, quat: LEVEL, reach: false });
   await move(hand, [to[0], high, to[2]], { seconds, quat: LEVEL, reach: false });
   await move(hand, to, { seconds: .4, quat: LEVEL, reach: false });
+}
+
+// ---------------------------------------------------------------- pack and holsters
+
+const backpack = () => {
+  const system = world.getSystem(BackpackSystem);
+  if (!system) throw new Error('no BackpackSystem');
+  return system;
+};
+const holsters = () => {
+  const system = world.getSystem(HolsterSystem);
+  if (!system) throw new Error('no HolsterSystem');
+  return system;
+};
+const other = (hand: Hand): Hand => (hand === 'right' ? 'left' : 'right');
+
+/** BackpackSystem's state: 'unowned' | 'worn' | 'held' | 'open' | 'dropped'. */
+export const packState = () => backpack().state;
+
+/** A point in the body frame (x right, y up, z behind, from the eyes), in world space. */
+export const bodyPoint = (x: number, y: number, z: number) => backpack().bodyPoint(x, y, z, new Vector3());
+
+/** Make sure the pack is on the back: an unowned or dropped pack is picked up and let go. */
+export async function wearPack(hand: Hand = 'right'): Promise<void> {
+  if (packState() === 'worn') return;
+  if (packState() === 'held' || packState() === 'open') {
+    const holding = holder(backpack().handle!);
+    if (holding) await release(holding);
+  } else {
+    await grab(loose('pack'), hand, 'the pack');
+    await release(hand);
+  }
+  await until(() => packState() === 'worn', 1000, 'the pack to go onto the back');
+}
+
+/** Reach over the shoulder for the worn pack, bring it round in front and pull the trigger: the panel unrolls. */
+export async function openPack(hand: Hand = 'left'): Promise<void> {
+  if (packState() !== 'open') {
+    await wearPack(hand);
+    await grab(loose('pack'), hand, 'the worn pack');
+    const front = bodyPoint(hand === 'right' ? .12 : -.12, -.12, -.42);
+    await move(hand, [front.x, front.y, front.z], { seconds: .4, quat: LEVEL, reach: false });
+    trigger(hand, 1);
+    await sleep(120);
+    trigger(hand, 0);
+  }
+  if (!(await waitFor(() => packState() === 'open', 1000))) {
+    const held = items((i) => i.held).map((i) => `${holder(i.entity)}:${i.kind}`).join(', ') || 'nothing';
+    throw new Error(`the pack did not open (state ${packState()}; holding ${held})`);
+  }
+  await nextFrame();
+  await nextFrame();
+}
+
+/**
+ * Take an item out of the pack: open it in the other hand, grab the item off its slot (a
+ * stack shows its top item: that one is taken if the filter names the stack's kind), then
+ * let the pack go (back onto the back).
+ */
+export async function takeFromPack(filter: (item: ItemInfo) => boolean, hand: Hand = 'right', what = 'item'): Promise<ItemInfo> {
+  const target = item(filter, what);
+  const packHand = other(hand);
+  if (holder(target.entity)) throw new Error(`${what} is not in the pack`);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await openPack(packHand);
+      await sleep(250); // the panel settles in front of the hand before reaching into it
+      let entity = target.entity;
+      if (!entity.object3D?.visible) {
+        const top = items((i) => i.slot === target.slot && i.entity.object3D?.visible === true)[0];
+        if (!top || top.kind !== target.kind || top.variant !== target.variant) throw new Error(`${what} is under a stack of ${top?.kind}`);
+        entity = top.entity;
+      }
+      const taken = await grab(same(entity), hand, what);
+      await release(packHand);
+      await until(() => packState() === 'worn', 1000, 'the pack to go back onto the back');
+      return taken;
+    } catch (error) {
+      if (attempt >= 1 || /under a stack/.test(String(error))) throw error;
+      note(`taking ${what} from the pack failed once (${String(error instanceof Error ? error.message : error).split(' (')[0]}); letting go and trying again`);
+      for (const side of ['left', 'right'] as const) if (items((i) => i.held && holder(i.entity) === side).length) await release(side);
+      await until(() => packState() === 'worn', 1500, 'the pack to go back onto the back');
+    }
+  }
+}
+
+/** Where an open pack's slot is (world), to bring a held item to. */
+export function packSlotPoint(index: number): Vector3 {
+  return backpack().slotPoint(index, new Vector3());
+}
+
+/** Bring the held item over the shoulder (behind the head, at the worn pack) and let go. */
+export async function stowOverShoulder(hand: Hand = 'right'): Promise<void> {
+  const at = bodyPoint(hand === 'right' ? .12 : -.12, -.25, .22);
+  await move(hand, [at.x, at.y, at.z], { seconds: .5, reach: false });
+  await sleep(100);
+  await release(hand);
+}
+
+/** Where a hip holster is now (world). */
+export const hipPoint = (side: Hand) => holsters().hipAt(side, new Vector3());
+
+/** Bring the held item to a hip and let go. */
+export async function holster(hand: Hand, side: Hand): Promise<void> {
+  const at = hipPoint(side);
+  await move(hand, [at.x, at.y, at.z], { seconds: .5, reach: false });
+  await sleep(100);
+  await release(hand);
+}
+
+/** Fixture: a new item of a kind dropped onto the ground at (x, z) (sets up a situation, like fixture()). */
+export async function spawnFixture(kind: string, x: number, z: number): Promise<ItemInfo> {
+  const entity = await world.getSystem(ItemSystem)?.dropAt(kind, x, z);
+  if (!entity) throw new Error(`fixture: could not spawn ${kind}`);
+  note(`fixture: dropped a ${kind} at ${x.toFixed(2)}, ${z.toFixed(2)}`);
+  await sleep(600); // it falls and settles
+  return info(entity);
 }

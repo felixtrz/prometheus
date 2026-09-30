@@ -85,6 +85,12 @@ export type GameEvent =
    * epilogue and its New journey prompt. Also readable any time as StorySystem.stats.
    */
   | { type: 'epilogue'; days: number; deaths: number; crafted: number; slain: number }
+  /**
+   * The opening journey (JourneySystem): a beat began (journey.ts JOURNEY_STEPS), or a
+   * one-shot cue: 'door-glance' (a slow touch on the jammed door), 'axe-left', 'pack-left',
+   * 'forest-done'. The guide hears it as 'journey:<step>'.
+   */
+  | { type: 'journey'; step: string }
   /** Request (not a notification): ItemSystem spawns a loose item here. */
   | { type: 'spawn-item'; kind: string; x: number; y: number; z: number; variant?: string; charges?: number; vx?: number; vy?: number; vz?: number };
 

@@ -644,119 +644,6 @@
           }
         },
         {
-          "id": "grove-pine-7",
-          "content": {
-            "type": "asset",
-            "asset": "pine-1",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -23.3,
-              0.108,
-              -5.5
-            ],
-            "rotationDeg": [
-              0,
-              300,
-              0
-            ],
-            "scale": [
-              0.88,
-              0.88,
-              0.88
-            ]
-          }
-        },
-        {
-          "id": "grove-deadwood-1",
-          "content": {
-            "type": "asset",
-            "asset": "deadwood",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -17.4,
-              -0.034,
-              -6
-            ],
-            "rotationDeg": [
-              0,
-              18,
-              0
-            ]
-          },
-          "components": {
-            "ResourceNode": {
-              "kind": "deadwood",
-              "yields": "log,stick,stick",
-              "hitsNeeded": 3,
-              "regrowSeconds": 240
-            }
-          }
-        },
-        {
-          "id": "grove-deadwood-2",
-          "content": {
-            "type": "asset",
-            "asset": "deadwood",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -22.6,
-              0.161,
-              -10.4
-            ],
-            "rotationDeg": [
-              0,
-              -62,
-              0
-            ]
-          },
-          "components": {
-            "ResourceNode": {
-              "kind": "deadwood",
-              "yields": "log,stick,stick",
-              "hitsNeeded": 3,
-              "regrowSeconds": 240
-            }
-          }
-        },
-        {
-          "id": "grove-deadwood-3",
-          "content": {
-            "type": "asset",
-            "asset": "deadwood",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -12,
-              1.07,
-              -13
-            ],
-            "rotationDeg": [
-              0,
-              40,
-              0
-            ]
-          },
-          "components": {
-            "ResourceNode": {
-              "kind": "deadwood",
-              "yields": "log,stick,stick",
-              "hitsNeeded": 3,
-              "regrowSeconds": 240
-            }
-          }
-        },
-        {
           "id": "grove-resin-1",
           "content": {
             "type": "asset",
@@ -780,7 +667,6 @@
             "ResourceNode": {
               "kind": "resin",
               "yields": "resin",
-              "hitsNeeded": 0,
               "regrowSeconds": 180
             }
           }
@@ -809,7 +695,6 @@
             "ResourceNode": {
               "kind": "resin",
               "yields": "resin",
-              "hitsNeeded": 0,
               "regrowSeconds": 180
             }
           }
@@ -838,7 +723,6 @@
             "ResourceNode": {
               "kind": "resin",
               "yields": "resin",
-              "hitsNeeded": 0,
               "regrowSeconds": 180
             }
           }
@@ -1422,7 +1306,6 @@
             "ResourceNode": {
               "kind": "canvas",
               "yields": "cloth",
-              "hitsNeeded": 0,
               "regrowSeconds": 240
             }
           },
@@ -1832,6 +1715,24 @@
       },
       "framingRole": "support",
       "children": [
+        {
+          "id": "valley-broadleaves",
+          "name": "Valley broadleaves",
+          "framingRole": "support",
+          "content": {
+            "type": "asset",
+            "asset": "valley-broadleaves",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
         {
           "id": "valley-pines-west-tall",
           "framingRole": "support",
@@ -2330,23 +2231,6 @@
             "distribution": {
               "type": "explicit",
               "transforms": [
-                {
-                  "position": [
-                    -27.3,
-                    -0.114,
-                    -9.94
-                  ],
-                  "rotationDeg": [
-                    0,
-                    58,
-                    0
-                  ],
-                  "scale": [
-                    0.989,
-                    1.139,
-                    0.989
-                  ]
-                },
                 {
                   "position": [
                     -7.38,
@@ -2889,23 +2773,6 @@
                 },
                 {
                   "position": [
-                    -26.22,
-                    -0.103,
-                    -7.56
-                  ],
-                  "rotationDeg": [
-                    0,
-                    136,
-                    0
-                  ],
-                  "scale": [
-                    1.07,
-                    1.201,
-                    1.07
-                  ]
-                },
-                {
-                  "position": [
                     -15.02,
                     0.051,
                     -5.97
@@ -2919,23 +2786,6 @@
                     0.827,
                     0.849,
                     0.827
-                  ]
-                },
-                {
-                  "position": [
-                    -32.87,
-                    1.247,
-                    8.32
-                  ],
-                  "rotationDeg": [
-                    0,
-                    235,
-                    0
-                  ],
-                  "scale": [
-                    0.947,
-                    1.025,
-                    0.947
                   ]
                 },
                 {
@@ -2970,40 +2820,6 @@
                     0.896,
                     0.798,
                     0.896
-                  ]
-                },
-                {
-                  "position": [
-                    -33.63,
-                    2.595,
-                    -2.87
-                  ],
-                  "rotationDeg": [
-                    0,
-                    53,
-                    0
-                  ],
-                  "scale": [
-                    1.189,
-                    1.126,
-                    1.189
-                  ]
-                },
-                {
-                  "position": [
-                    -33.7,
-                    2.52,
-                    3.34
-                  ],
-                  "rotationDeg": [
-                    0,
-                    246,
-                    0
-                  ],
-                  "scale": [
-                    0.885,
-                    0.974,
-                    0.885
                   ]
                 },
                 {
@@ -3072,23 +2888,6 @@
                     0.917,
                     1.011,
                     0.917
-                  ]
-                },
-                {
-                  "position": [
-                    -24.53,
-                    0.477,
-                    12.29
-                  ],
-                  "rotationDeg": [
-                    0,
-                    115,
-                    0
-                  ],
-                  "scale": [
-                    0.821,
-                    0.906,
-                    0.821
                   ]
                 },
                 {
@@ -3178,40 +2977,6 @@
                 },
                 {
                   "position": [
-                    -29.92,
-                    -0.124,
-                    -4.38
-                  ],
-                  "rotationDeg": [
-                    0,
-                    299,
-                    0
-                  ],
-                  "scale": [
-                    0.909,
-                    0.829,
-                    0.909
-                  ]
-                },
-                {
-                  "position": [
-                    -29.05,
-                    -0.069,
-                    4.17
-                  ],
-                  "rotationDeg": [
-                    0,
-                    19,
-                    0
-                  ],
-                  "scale": [
-                    1.043,
-                    1.292,
-                    1.043
-                  ]
-                },
-                {
-                  "position": [
                     12.74,
                     0.417,
                     -0.8
@@ -3225,23 +2990,6 @@
                     0.987,
                     1.217,
                     0.987
-                  ]
-                },
-                {
-                  "position": [
-                    -25.57,
-                    -0.075,
-                    3.48
-                  ],
-                  "rotationDeg": [
-                    0,
-                    69,
-                    0
-                  ],
-                  "scale": [
-                    0.893,
-                    1.069,
-                    0.893
                   ]
                 },
                 {
@@ -3263,40 +3011,6 @@
                 },
                 {
                   "position": [
-                    -19.95,
-                    -0.33,
-                    3.14
-                  ],
-                  "rotationDeg": [
-                    0,
-                    272,
-                    0
-                  ],
-                  "scale": [
-                    0.814,
-                    0.786,
-                    0.814
-                  ]
-                },
-                {
-                  "position": [
-                    -28.58,
-                    -0.165,
-                    -0.01
-                  ],
-                  "rotationDeg": [
-                    0,
-                    219,
-                    0
-                  ],
-                  "scale": [
-                    1.059,
-                    1.368,
-                    1.059
-                  ]
-                },
-                {
-                  "position": [
                     29.03,
                     -0.181,
                     1.09
@@ -3314,23 +3028,6 @@
                 },
                 {
                   "position": [
-                    -19.84,
-                    -0.215,
-                    8.39
-                  ],
-                  "rotationDeg": [
-                    0,
-                    85,
-                    0
-                  ],
-                  "scale": [
-                    0.836,
-                    0.731,
-                    0.836
-                  ]
-                },
-                {
-                  "position": [
                     9.56,
                     0.456,
                     8.18
@@ -3344,23 +3041,6 @@
                     1.019,
                     1.219,
                     1.019
-                  ]
-                },
-                {
-                  "position": [
-                    -16.81,
-                    -0.476,
-                    4.16
-                  ],
-                  "rotationDeg": [
-                    0,
-                    289,
-                    0
-                  ],
-                  "scale": [
-                    0.822,
-                    0.927,
-                    0.822
                   ]
                 },
                 {
@@ -3408,23 +3088,6 @@
                     0.835,
                     1.024,
                     0.835
-                  ]
-                },
-                {
-                  "position": [
-                    -21.16,
-                    -0.298,
-                    -2.8
-                  ],
-                  "rotationDeg": [
-                    0,
-                    355,
-                    0
-                  ],
-                  "scale": [
-                    1.076,
-                    1.35,
-                    1.076
                   ]
                 },
                 {
@@ -3612,23 +3275,6 @@
                     0.875,
                     1.019,
                     0.875
-                  ]
-                },
-                {
-                  "position": [
-                    -12.36,
-                    -0.343,
-                    6.85
-                  ],
-                  "rotationDeg": [
-                    0,
-                    52,
-                    0
-                  ],
-                  "scale": [
-                    0.949,
-                    1.136,
-                    0.949
                   ]
                 },
                 {
@@ -5959,23 +5605,6 @@
                     1.33,
                     1.487,
                     1.33
-                  ]
-                },
-                {
-                  "position": [
-                    -24.02,
-                    3.324,
-                    15.56
-                  ],
-                  "rotationDeg": [
-                    0,
-                    30,
-                    0
-                  ],
-                  "scale": [
-                    0.865,
-                    0.857,
-                    0.865
                   ]
                 },
                 {
@@ -9203,23 +8832,6 @@
                     1.281,
                     1.471,
                     1.281
-                  ]
-                },
-                {
-                  "position": [
-                    -36.47,
-                    4.829,
-                    7.41
-                  ],
-                  "rotationDeg": [
-                    0,
-                    170,
-                    0
-                  ],
-                  "scale": [
-                    1.241,
-                    1.608,
-                    1.241
                   ]
                 },
                 {

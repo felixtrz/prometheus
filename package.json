@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "iwsdk dev up --open --foreground",
-    "dev:runtime": "vite",
+    "dev:runtime": "PROMETHEUS_CDP_PORT=${PROMETHEUS_CDP_PORT-9333} vite",
     "dev:down": "iwsdk dev down",
     "dev:status": "iwsdk dev status",
     "reference:status": "iwsdk reference status",
@@ -15,7 +15,6 @@
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs",
     "check": "node tests/vitexec-run.mjs",
-    "check:managed": "node tests/vitexec-managed.mjs",
     "typecheck:tools": "tsc --noEmit -p tsconfig.tools.json"
   },
   "dependencies": {

@@ -77,7 +77,7 @@ export const CLIP_DEFS: Readonly<Record<OneShotId, ClipDef>> = {
   snap: P(0.8, 2, 1, 1.3, 25, 0.05, 2),
   'pack-unroll': P(0.7, 1, 1.5, 1.2, 30, 0.3),
   'sfx-pack-roll': P(0.65, 1, 1, 1.2, 30, 0.3),
-  'sfx-page': H(0.6, 2, 0.15),
+  'sfx-page': P(0.6, 2, 0.5, 1, 15, 0.15),
   // weapons & combat
   'spear-whoosh': P(0.6, 1, 1.5, 1, 40, 0.1),
   hit: P(0.95, 3, 2, 1, 50, 0.05, 3),
@@ -149,9 +149,9 @@ export interface AudioCue {
 export const createCue = (): AudioCue => ({ clip: 'grab', volume: 0, positional: false, refDistance: 1, x: 0, y: 0, z: 0 });
 
 /** Item kinds that land with a full thud; everything else taps. */
-const HEAVY: ReadonlySet<string> = new Set(['log', 'plank', 'hammer', 'axe', 'crossbow', 'sentry-kit', 'bowl', 'torch', 'spear', 'pack']);
+const HEAVY: ReadonlySet<string> = new Set(['log', 'plank', 'limb', 'hammer', 'axe', 'crossbow', 'sentry-kit', 'bowl', 'torch', 'spear', 'pack']);
 /** Harvests that already sound through their chop/split cue. */
-const WOODEN_YIELD: ReadonlySet<string> = new Set(['log', 'stick', 'plank', 'deadwood']);
+const WOODEN_YIELD: ReadonlySet<string> = new Set(['log', 'stick', 'plank']);
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 type Point = { readonly x: number; readonly y: number; readonly z: number };
@@ -179,10 +179,12 @@ const head = (out: AudioCue, clip: OneShotId, scale = 1) => fill(out, clip, scal
  */
 export function mapEvent(event: GameEvent, out: AudioCue = createCue()): AudioCue | null {
   switch (event.type) {
-    case 'grab': return event.kind === 'page' ? head(out, 'sfx-page', 0.7) : at(out, 'grab', event);
+    case 'grab': return at(out, event.kind === 'page' ? 'sfx-page' : 'grab', event, event.kind === 'page' ? 0.7 : 1);
     case 'drop':
       // A bolt or spear landing point-first thunks into the ground (audible at range).
       if (event.hard && (event.kind === 'bolt' || event.kind === 'spear')) return at(out, 'bolt-thunk', event, event.kind === 'spear' ? 1 : 0.8, 4);
+      // The torn door panel slamming onto the ground outside the wreck.
+      if (event.kind === 'wreck-door') return at(out, 'drop', event, 1, 4);
       return at(out, HEAVY.has(event.kind) ? 'drop' : 'drop-light', event, event.hard ? 1 : 0.7);
     case 'snap': return at(out, 'snap', event);
     case 'reject': return at(out, 'invalid-clunk', event);
@@ -201,15 +203,19 @@ export function mapEvent(event: GameEvent, out: AudioCue = createCue()): AudioCu
     // A first-time craft also emits recipe-learned; let that chime play alone.
     case 'crafted': return event.learned ? null : at(out, 'craft-complete', event);
     case 'chop': {
+      // Butchering a carcass with the axe: a meaty hit, never wood.
+      if (event.node === 'carcass') return at(out, 'hit', event, 0.8);
       const split = event.remaining <= 0 || event.node.includes('stump') || event.node.includes('split');
       return at(out, split ? 'wood-split' : 'chop', event);
     }
     case 'harvest':
       if (WOODEN_YIELD.has(event.kind)) return null;
+      if (event.kind === 'meat') return at(out, 'drop', event, 0.7);
       return at(out, event.kind === 'flint' ? 'drop-light' : 'rustle', event);
     case 'torch-lit': return at(out, 'ignite', event, 0.6, 1);
     case 'pack': return at(out, event.state === 'unrolled' ? 'pack-unroll' : event.state === 'worn' ? 'snap' : 'sfx-pack-roll', event);
-    case 'page': return head(out, 'sfx-page', event.first ? 1 : 0.7);
+    // The event has no position: the AudioSystem moves the cue to the hand holding the page.
+    case 'page': return fill(out, 'sfx-page', event.first ? 1 : 0.7, 0, 0, 0);
     case 'recipe-learned': return head(out, 'recipe-learned');
     case 'objective': return head(out, 'recipe-learned', 0.6);
     case 'throw': {
@@ -240,7 +246,9 @@ export function mapEvent(event: GameEvent, out: AudioCue = createCue()): AudioCu
         default: return null;
       }
     case 'hurt': {
-      const scale = clamp(0.55 + event.amount / 50, 0.55, 1);
+      // Starving ticks every few seconds: a soft breath; the AudioSystem restores the grunt on every STARVE.every-th tick (starveScale).
+      if (event.cause === 'starving') return head(out, 'player-hurt', STARVE.soft);
+      const scale = hurtScale(event.amount);
       // With an attacker's x/z the blow lands on its side ('player-struck' sits `near` the head).
       return event.x !== undefined && event.z !== undefined
         ? fill(out, 'player-struck', scale, event.x, 0, event.z)
@@ -256,6 +264,10 @@ export function mapEvent(event: GameEvent, out: AudioCue = createCue()): AudioCu
     // The theme now starts on the finale's 'theme' step.
     case 'ending': return null;
     case 'thud':
+      // An axe blow on the wreck's jammed door: metal, not wood.
+      if (event.kind === 'wreck-door') return at(out, 'hammer-clank', event, 1, 3);
+      // A felled tree landing: the heaviest thud there is, heard across the grove.
+      if (event.kind === 'tree-fall') return at(out, 'drop', event, 1, 8);
       if (event.kind === 'bolt' || event.kind === 'spear') return at(out, 'bolt-thunk', event, event.kind === 'spear' ? 1 : 0.8);
       return at(out, 'knock', event, event.kind === 'hammer' || event.kind === 'axe' ? 1 : 0.7);
     case 'bench-set': return event.valid ? at(out, 'bench-ready', CAMP.bench, event.known ? 1 : 0.8) : at(out, 'invalid-clunk', CAMP.bench);
@@ -279,6 +291,8 @@ export function mapEvent(event: GameEvent, out: AudioCue = createCue()): AudioCu
     case 'guide':
     case 'guide-end':
     case 'journey-begin':
+    // The journey's beats sound through the guide and the actions themselves.
+    case 'journey':
     case 'toast':
     case 'new-game':
     case 'spawn-item':
@@ -294,6 +308,21 @@ export function mapEvent(event: GameEvent, out: AudioCue = createCue()): AudioCu
       return null;
   }
 }
+
+/** Hurt grunt level for `amount` damage. */
+const hurtScale = (amount: number) => clamp(0.55 + amount / 50, 0.55, 1);
+
+/**
+ * Starving hurts: a soft breath (`soft` of the grunt clip's level) on most ticks, a full
+ * grunt on the first of a run and every `every`-th after; a gap over `reset` s starts a new run.
+ */
+export const STARVE = { soft: 0.25, every: 3, reset: 10 } as const;
+/** Level of the `tick`-th (0-based) starving hurt of a run. */
+export const starveScale = (tick: number, amount: number): number => (tick % STARVE.every === 0 ? hurtScale(amount) : STARVE.soft);
+
+/** Shared room send for positional one-shots: wet = clamp((d − start) / span, 0, max) of the dry level. */
+export const REVERB = { start: 4, span: 40, max: 0.3 } as const;
+export const reverbWet = (distance: number): number => clamp((distance - REVERB.start) / REVERB.span, 0, REVERB.max);
 
 // ─── Loop curves (pure; the AudioSystem applies them) ───
 

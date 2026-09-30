@@ -5,13 +5,13 @@
  * authored in world coordinates and placed at the scene origin.
  */
 import {
-  BufferAttribute, BufferGeometry, BoxGeometry, CircleGeometry, Color, CylinderGeometry, DataTexture, DodecahedronGeometry, DoubleSide, ExtrudeGeometry, Group,
-  IcosahedronGeometry, Mesh, MeshStandardMaterial, Path, PlaneGeometry, RGBAFormat, Shape, ShapeGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3,
+  AdditiveBlending, BufferAttribute, BufferGeometry, BoxGeometry, CircleGeometry, Color, CylinderGeometry, DataTexture, DodecahedronGeometry, DoubleSide, ExtrudeGeometry, Group,
+  IcosahedronGeometry, Mesh, MeshBasicMaterial, MeshStandardMaterial, Path, PlaneGeometry, RGBAFormat, Shape, ShapeGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3,
 } from '@iwsdk/core';
 import { batchStatic } from './static-batch.js';
 import { smoothSampling } from './procedural-textures.js';
 import {
-  boulder, broadleaf, colliders, fern, flameShape, FLOWERS, GRASS, ground, litter, mats, mountain, mossMound, paint, pebble, put, root as rootBranch,
+  boulder, broadleafFootprint, colliders, fern, flameShape, FLOWERS, GRASS, ground, litter, mats, mountain, mossMound, paint, pebble, put, root as rootBranch,
   shadow, shrub, span, steppingStone, treeShadow, tuft,
 } from './valley-kit.scene-asset.js';
 import {
@@ -53,7 +53,7 @@ const local = (f: Group, lx: number, lz: number) => {
 // ================================================================== shared keep-outs
 const nodeSpots: [number, number, number][] = [
   ...GROVE.resinPines.map((p): [number, number, number] => [p.x, p.z, 1.1]),
-  ...GROVE.deadwood.map((p): [number, number, number] => [p.x, p.z, 1.3]),
+  ...GROVE.glades.map((p): [number, number, number] => [p.x, p.z, 1.3]),
   ...GROVE.mushrooms.map((p): [number, number, number] => [p.x, p.z, .9]),
   [GROVE.stump.x, GROVE.stump.z, 1], [GROVE.brazier.x, GROVE.brazier.z, 1.3],
   ...MEADOW.berries.map((p): [number, number, number] => [p.x, p.z, 1.2]),
@@ -127,7 +127,8 @@ const clearOfNodes = (x: number, z: number, pad = 0) => nodeSpots.every(([px, pz
     if (random() > .3) continue;
     tuft(g, x, z, .7 + random() * .45, [GRASS.meadow, GRASS.lime, GRASS.olive], random() < .62 ? blooms[i % blooms.length] : null);
   }
-  for (const t of BROADLEAVES) if (t.region === 'meadow') broadleaf(g, t.x, t.z, t.h, t.yaw, t.variant);
+  // Meadow broadleaves are drawn (and felled) by ForestSystem; the batch keeps their shadow and collider.
+  for (const t of BROADLEAVES) if (t.region === 'meadow') broadleafFootprint(t.x, t.z, t.h);
   for (const [x, z, r, yaw] of [[7.8, -9.6, .5, .3], [17.8, -24.6, .55, 1.4], [24.6, -15.8, .45, 2.2], [9.4, -24.8, .5, .8]]) shrub(g, x, z, r, yaw);
   for (const [x, z, h, yaw] of [[12, 4.5, 1.2, .5], [9, -28, 1.1, 1.6], [14, -33.5, 1.3, .2], [26.4, -27.5, 1, 2.5], [29.5, -8.5, .9, 1.1]]) boulder(g, x, z, h, yaw);
   // Page 4's flat rock on the west bank is the 'brook-page-rock' ItemSurface prop.
@@ -597,6 +598,23 @@ function stepSlab(seed: number): BufferGeometry {
   put(marker, cyl(.05, .06, 1.5, 6, 0x6b4830), mats.solid, [0, .75, 0]);
   put(marker, box(.62, .13, .03, 0x9a6f48), mats.solid, [-.24, 1.3, .03], [0, 0, .06]);
   put(marker, box(.58, .13, .03, 0x8a6040), mats.solid, [.22, 1.08, .03], [0, 0, -.05]);
+  // Burnt-in pictograms on both faces of each board: a pine for the grove fork (left), a deer
+  // for the meadow fork (right). Flat shapes in the trail batch: no extra draw.
+  const pictogram = (points: number[], at: V3, roll: number, x: number) => {
+    const shape = new Shape();
+    shape.moveTo(points[0] * .0105, points[1] * .0105);
+    for (let i = 2; i < points.length; i += 2) shape.lineTo(points[i] * .0105, points[i + 1] * .0105);
+    const board = new Group();
+    board.position.set(...at);
+    board.rotation.z = roll;
+    marker.add(board);
+    for (const face of [1, -1]) put(board, paint(new ShapeGeometry(shape), 0x2e1c10, 0), mats.solid, [x, -.05, .0158 * face], [0, face > 0 ? 0 : Math.PI, 0]);
+  };
+  pictogram([-.5, 0, .5, 0, .5, 1.4, 3.4, 1.4, 1.5, 3.8, 2.8, 3.8, 1.1, 6.2, 2.1, 6.2, 0, 9.6, -2.1, 6.2, -1.1, 6.2, -2.8, 3.8, -1.5, 3.8, -3.4, 1.4, -.5, 1.4], [-.24, 1.3, .03], .06, -.2);
+  pictogram([
+    -4.6, 0, -4, 0, -3.6, 3, 2.4, 3, 2.9, 0, 3.5, 0, 3.4, 3.4, 3.9, 4.6, 4.6, 6.8, 5.9, 7, 6, 7.6, 4.9, 8.4,
+    5.4, 9.8, 4.9, 9.9, 4.5, 8.7, 3.9, 9.9, 3.5, 9.7, 3.9, 8.3, 3.6, 6.2, -3.8, 5.4, -5.1, 5.8, -4.7, 4.8, -4.9, 3.4,
+  ], [.22, 1.08, .03], -.05, .15);
   put(marker, paint(new ShapeGeometry(flameShape(.07)), 0xc8502a, 0), mats.solid, [0, 1.42, .036]);
   shadow(2.7, -10.4, .3, .3, .3, .8);
   const cairn = frame(-2.8, -22.4, 0);
@@ -675,7 +693,6 @@ function stepSlab(seed: number): BufferGeometry {
 // Baked contact shadows for the scene-placed props and trees (their nodes live in the scene).
 for (const p of GLB_PINES) treeShadow(p.x, p.z, 7.3 * p.scale, 7.3 * p.scale * .26);
 for (const stand of Object.values(VALLEY_PINES)) for (const t of stand) treeShadow(t.x, t.z, 5.6 * t.scale, 1.4 * t.scale);
-for (const d of GROVE.deadwood) shadow(d.x, d.z, .95, .32, .34, 0, d.yawDeg);
 for (const m of GROVE.mushrooms) shadow(m.x - .2, m.z - .15, .55, .5, .28);
 for (const b of MEADOW.berries) shadow(b.x, b.z, .75, .7, .34, .4);
 for (const h of MEADOW.herbs) shadow(h.x, h.z, .35, .3, .2);
@@ -702,7 +719,8 @@ export const valleySpire = bake('spire', 'Valley: the Spire');
   const size = 64, data = new Uint8Array(size * size * 4);
   for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
     const u = i / (size - 1) - .5, v = j / (size - 1) - .5, r = Math.hypot(u, v) * 2, a = Math.atan2(v, u);
-    const t = Math.min(1, r + .08 * Math.sin(a * 7 + r * 9));
+    // Purely angular ripples: straight rays out of the heart, never a spiral.
+    const t = Math.min(1, r + .06 * Math.sin(a * 7) + .035 * Math.sin(a * 13 + 1.7));
     const c0 = new Color(0xfff3c0), c1 = new Color(0xffb347), c2 = new Color(0xff5a14);
     const cc = t < .45 ? c0.lerp(c1, t / .45) : c1.lerp(c2, (t - .45) / .55);
     const o = (j * size + i) * 4;
@@ -725,21 +743,43 @@ export const valleySpire = bake('spire', 'Valley: the Spire');
   const tuv = tube.getAttribute('uv');
   for (let i = 0; i < tuv.count; i++) tuv.setXY(i, .93, .5);
   parts.push(tube);
-  const merged = new BufferGeometry(), mp: number[] = [], mn: number[] = [], mu: number[] = [], mi: number[] = [];
-  for (const part of parts) {
-    const base = mp.length / 3, pp = part.getAttribute('position'), pn = part.getAttribute('normal'), pu = part.getAttribute('uv'), pi = part.getIndex()!;
-    for (let i = 0; i < pp.count; i++) { mp.push(pp.getX(i), pp.getY(i), pp.getZ(i)); mn.push(pn.getX(i), pn.getY(i), pn.getZ(i)); mu.push(pu.getX(i), pu.getY(i)); }
-    for (let i = 0; i < pi.count; i++) mi.push(pi.getX(i) + base);
-  }
-  merged.setAttribute('position', new BufferAttribute(new Float32Array(mp), 3));
-  merged.setAttribute('normal', new BufferAttribute(new Float32Array(mn), 3));
-  merged.setAttribute('uv', new BufferAttribute(new Float32Array(mu), 2));
-  merged.setIndex(mi);
-  merged.computeBoundingSphere();
-  const disc = new Mesh(merged, eyeMaterial);
+  const mergeParts = (list: BufferGeometry[]) => {
+    const merged = new BufferGeometry(), mp: number[] = [], mn: number[] = [], mu: number[] = [], mi: number[] = [];
+    for (const part of list) {
+      const base = mp.length / 3, pp = part.getAttribute('position'), pn = part.getAttribute('normal'), pu = part.getAttribute('uv'), pi = part.getIndex()!;
+      for (let i = 0; i < pp.count; i++) { mp.push(pp.getX(i), pp.getY(i), pp.getZ(i)); mn.push(pn.getX(i), pn.getY(i), pn.getZ(i)); mu.push(pu.getX(i), pu.getY(i)); }
+      for (let i = 0; i < pi.count; i++) mi.push(pi.getX(i) + base);
+      part.dispose();
+    }
+    merged.setAttribute('position', new BufferAttribute(new Float32Array(mp), 3));
+    merged.setAttribute('normal', new BufferAttribute(new Float32Array(mn), 3));
+    merged.setAttribute('uv', new BufferAttribute(new Float32Array(mu), 2));
+    merged.setIndex(mi);
+    merged.computeBoundingSphere();
+    return merged;
+  };
+  const disc = new Mesh(mergeParts(parts), eyeMaterial);
   disc.position.set(.15, 8.6, 0);
   disc.name = 'Spire eye flame';
   eye.add(disc);
+  // A small additive halo spilling onto the stone around both mouths (FxSystem ramps its opacity).
+  const hs = 64, halo = new Uint8Array(hs * hs * 4);
+  for (let j = 0; j < hs; j++) for (let i = 0; i < hs; i++) {
+    const r = Math.hypot(i / (hs - 1) - .5, j / (hs - 1) - .5) * 2;
+    // Clear over the flame disc (r < .5 of the halo's 1.7 m), brightest at the rim, fading out.
+    const k = r < .5 ? smooth(.34, .52, r) : Math.max(0, 1 - (r - .52) / .48) ** 2;
+    const o = (j * hs + i) * 4;
+    halo[o] = 255; halo[o + 1] = 150; halo[o + 2] = 60; halo[o + 3] = Math.round(255 * k);
+  }
+  const haloMap = smoothSampling(new DataTexture(halo, hs, hs, RGBAFormat));
+  const haloMaterial = new MeshBasicMaterial({ map: haloMap, transparent: true, opacity: .55, blending: AdditiveBlending, depthWrite: false, side: DoubleSide });
+  haloMaterial.name = 'Spire eye halo';
+  const haloGeometry = mergeParts([new CircleGeometry(1.7, 32).translate(0, 0, depth + .04), new CircleGeometry(1.7, 32).translate(0, 0, -depth - .04)]);
+  const haloMesh = new Mesh(haloGeometry, haloMaterial);
+  haloMesh.position.copy(disc.position);
+  haloMesh.name = 'spire-eye-halo';
+  haloMesh.renderOrder = 3;
+  eye.add(haloMesh);
   eye.visible = false;
   valleySpire.add(eye);
 }

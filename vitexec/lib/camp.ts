@@ -1,14 +1,15 @@
 /**
  * Camp routines shared by the gameplay checks: standing at the bench, filling
- * bays, hammering a recipe, lighting a torch at the fire.
+ * bays, hammering a recipe, gathering raw materials, splitting a log on the stump,
+ * lighting a torch at the fire.
  */
 import { Quaternion, Vector3 } from '@iwsdk/core';
 import { ITEMS } from '/src/game/catalog.ts';
 import { Campfire, CraftBench } from '/src/game/components.ts';
-import { CAMP } from '/src/game/rules.ts';
+import { CAMP, SURFACES } from '/src/game/rules.ts';
 import {
-  bring, check, grab, head, horizontal, item, items, locomote, look, loose, move, release, rest, same, sleep, state,
-  trigger, turnHeld, waitFor, type Hand, type ItemInfo, type V3,
+  bring, check, grab, head, holder, holster, note, horizontal, info, item, items, locomote, look, loose, move, nearest, release, rest, same,
+  sleep, state, stowOverShoulder, trigger, turnHeld, until, waitFor, type Hand, type ItemInfo, type V3,
 } from '/vitexec/lib/harness.ts';
 
 export const FIRE: V3 = [CAMP.fire.x, CAMP.fire.y, CAMP.fire.z];
@@ -65,6 +66,80 @@ export async function hammerOut(product: string): Promise<ItemInfo> {
   return items(loose(product)).find((it) => !before.has(it.entity))!;
 }
 
+/**
+ * The nearest item of a kind a player could take right now, from `near` (default: the
+ * head): loose, in the pack, or waiting at a forage node (taking that one pulls it).
+ */
+export const takeable = (kind: string, near?: V3) => nearest((it) => it.kind === kind && it.slot !== 'consumed'
+  && !it.slot.startsWith('bay-') && !it.held, near ?? head());
+
+/**
+ * Pick up the item a filter names (walking to it; one waiting at a forage node is pulled)
+ * and stow it over the shoulder into the worn pack, where it stacks with its kind.
+ */
+export async function gather(filter: (item: ItemInfo) => boolean, what: string, hand: Hand = 'right'): Promise<ItemInfo> {
+  const taken = await grab(filter, hand, what);
+  await stowOverShoulder(hand);
+  await until(() => info(taken.entity).slot.startsWith('pack-'), 1500, `the ${what} to go into the pack`);
+  return info(taken.entity);
+}
+
+/**
+ * Gather `count` of a kind into the pack, each time the nearest one lying loose or waiting
+ * at a forage node (pulling a reed clump drops its other reeds at its foot: those come next).
+ */
+export async function gatherKind(kind: string, count: number, near?: V3): Promise<void> {
+  for (let i = 0; i < count; i++) {
+    await gather(nearest((it) => it.kind === kind && (it.slot === '' || it.slot === 'node') && !it.held, near ?? head()), kind);
+  }
+}
+
+/** Put the held tool away the way a player would: the axe on the right hip, anything else in the pack. */
+export async function putAway(hand: Hand = 'right'): Promise<void> {
+  const held = items((it) => it.held && holder(it.entity) === hand)[0];
+  if (held?.kind === 'axe') await holster(hand, 'right');
+  else await stowOverShoulder(hand);
+  await rest(hand, .3);
+}
+
+/** Fill the three bays with these kinds (each the nearest takeable) and hammer out the product. */
+export async function craft(product: string, kinds: readonly [string, string, string]): Promise<ItemInfo> {
+  for (let i = 0; i < 3; i++) {
+    const from = item(takeable(kinds[i]), kinds[i]).slot || 'ground';
+    const taken = await grab(takeable(kinds[i]), 'right', kinds[i]);
+    await toBay('right', i);
+    const landed = info(taken.entity).slot;
+    if (landed !== `bay-${i}`) note(`${kinds[i]} from ${from} landed in '${landed}', not bay-${i}`);
+  }
+  return hammerOut(product);
+}
+
+/** Twist three reeds into cord: pulled from the nearest clumps (or already gathered) and hammered at the bench. */
+export const twistCord = () => craft('cord', ['reeds', 'reeds', 'reeds']);
+
+const STUMP = SURFACES.find((surface) => surface.id === 'stump')!;
+
+/** Lay the nearest log on the camp stump and split it with two axe blows: two planks. */
+export async function splitLog(): Promise<void> {
+  const axe = await grab(loose('axe'), 'right', 'axe');
+  await rest('right');
+  await grab(nearest(loose('log'), [STUMP.x, STUMP.y, STUMP.z]), 'left', 'log');
+  await move('left', [STUMP.x, STUMP.y + .2, STUMP.z], { seconds: .5 });
+  await release('left');
+  await rest('left');
+  const log = item(nearest(loose('log'), [STUMP.x, STUMP.y, STUMP.z]), 'log on the stump');
+  check(horizontal(log.position, [STUMP.x, 0, STUMP.z]) < .3 && log.position.y > STUMP.y, 'the log rests on the stump');
+  const before = items(loose('plank')).length;
+  const at = log.position;
+  for (let i = 0; i < 4 && items(same(log.entity)).some((it) => it.kind === 'log' && it.slot !== 'consumed'); i++) {
+    await bring('right', axe.entity, ITEMS.axe.tip!, [at.x, at.y + .9, at.z], .35);
+    await bring('right', axe.entity, ITEMS.axe.tip!, [at.x, at.y, at.z], .12);
+    await sleep(420);
+  }
+  check(await waitFor(() => items(loose('plank')).length >= before + 2, 2000), 'two axe blows split the log on the stump into two planks');
+  await putAway('right');
+}
+
 /** Light the campfire the way the opening teaches: lighter flame to the tinder. */
 export async function lightFire(): Promise<void> {
   const lighter = await grab(loose('lighter'), 'right', 'lighter');
@@ -75,8 +150,9 @@ export async function lightFire(): Promise<void> {
   const lit = await waitFor(() => state(Campfire).lit === true, 3000);
   trigger('right', 0);
   check(lit, 'the lighter lights the campfire');
-  await rest('right');
-  await release('right');
+  // Back on the left hip, where the journey keeps it.
+  await holster('right', 'left');
+  await rest('right', .3);
 }
 
 /** Hold an unlit torch's head in the lit campfire until it catches. */

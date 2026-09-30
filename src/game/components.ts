@@ -6,7 +6,8 @@ import { createComponent, Types } from '@iwsdk/core';
 
 /**
  * Anything the player can pick up. `slot` says where it currently lives:
- * '' loose in the world, 'pot', 'fire', 'bay-0..2', 'pack-0..8', 'lost-<n>',
+ * '' loose in the world, 'hand', 'pot', 'fire', 'bay-0..2', 'pack-0..8' (a stack
+ * shares its slot), 'hip-left' | 'hip-right', 'worn' (the pack itself), 'lost-<n>',
  * 'sentry', 'consumed'. `charges` is kind-specific (bolts loaded, bundle size,
  * stew servings); `lit` covers torch/lighter flames; `uid` survives save/load.
  */
@@ -45,17 +46,21 @@ export const CraftBench = createComponent('CraftBench', {
   match: { type: Types.String, default: '' },
 });
 
+/**
+ * The backpack's slot panel (BackpackSystem). `state`: 'unowned' (the pack lies where the
+ * scene put it until first picked up), 'worn', 'held', 'open' (panel unrolled in the hand),
+ * 'dropped' (lost at death). Author 'worn' to start with it on the back; any other value
+ * starts it unowned.
+ */
 export const Backpack = createComponent('Backpack', {
-  /** 'unrolled' | 'held' | 'worn' */
-  state: { type: Types.String, default: 'unrolled' },
+  state: { type: Types.String, default: 'unowned' },
 });
 
-/** Harvestable world feature: deadwood, resin, mushrooms, berries, reeds, flint. */
+/** Forage node: resin, mushrooms, berries, herbs, reeds, flint. Taking its item starts regrowth. */
 export const ResourceNode = createComponent('ResourceNode', {
-  kind: { type: Types.String, default: 'deadwood' },
+  kind: { type: Types.String, default: 'resin' },
   /** Item kinds produced, comma separated, e.g. 'log,stick,stick'. */
   yields: { type: Types.String, default: 'stick' },
-  hitsNeeded: { type: Types.Int8, default: 0 },
   hits: { type: Types.Int8, default: 0 },
   available: { type: Types.Boolean, default: true },
   regrowAt: { type: Types.Float32, default: 0 },
@@ -70,6 +75,23 @@ export const Creature = createComponent('Creature', {
   heading: { type: Types.Float32, default: 0 },
   speed: { type: Types.Float32, default: 0 },
   home: { type: Types.Vec3, default: [0, 0, 0] },
+});
+
+/**
+ * A slain deer or rabbit: the creature's own model left lying on its side (runtime-only,
+ * never saved, not authorable). Axe blows butcher it (ButcherSystem): `hits` so far,
+ * `armed` until a blow lands (pull the blade back to re-arm). `state` 'lying', then
+ * 'butchered' or 'rotting' while it sinks away over `timer` seconds; `age` counts
+ * seconds since it fell; `ground` is where it lies (the sink's base height).
+ */
+export const Carcass = createComponent('Carcass', {
+  species: { type: Types.String, default: 'deer' },
+  hits: { type: Types.Int8, default: 0 },
+  armed: { type: Types.Boolean, default: true },
+  state: { type: Types.String, default: 'lying' },
+  age: { type: Types.Float32, default: 0 },
+  timer: { type: Types.Float32, default: 0 },
+  ground: { type: Types.Float32, default: 0 },
 });
 
 /** Scene-authored herd or pack anchor; the creature system spawns around it. */

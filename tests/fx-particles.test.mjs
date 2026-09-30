@@ -20,7 +20,7 @@ const { outputText } = ts.transpileModule(readFileSync(file, 'utf8'), {
 const target = join(out, relative(root, file)).replace(/\.ts$/, '.js');
 mkdirSync(dirname(target), { recursive: true });
 writeFileSync(target, outputText);
-const { BURSTS, ParticlePool } = await import(pathToFileURL(target).href);
+const { BURSTS, ParticlePool, beckonRank } = await import(pathToFileURL(target).href);
 const { Vector3 } = await import('@iwsdk/core');
 
 test('an idle pool draws nothing; a burst shows it until its last particle dies', () => {
@@ -55,4 +55,29 @@ test('a grabbable sparkle reads from 2–3 m without being a flare', () => {
   for (let i = 0; i < 30; i++) { pool.update(1 / 60); trace.push(sizes.getX(0)); }
   const peak = Math.max(...trace);
   assert.ok(trace[0] < peak * .5 && peak > BURSTS.sparkle.size * .9, `swells to its size (${peak.toFixed(3)})`);
+});
+
+test('page 1 beckons only after the meal or the note line, and then ahead of everything', () => {
+  const state = { task: 'eat-meal', potA: '', potB: '', stew: '', placed: 0, mealDone: false, noteWaiting: true, noteStarted: false };
+  assert.ok(beckonRank(state, 'meat', 'pack-0', '', 0) > 0, 'the meal comes first');
+  assert.equal(beckonRank(state, 'page', 'pack-1', '', 1), -1, 'the page waits while the meal is the task');
+  state.noteStarted = true;
+  assert.equal(beckonRank(state, 'page', 'pack-1', '', 1), 0, 'the note line points at the page');
+  state.noteStarted = false;
+  state.mealDone = true;
+  assert.equal(beckonRank(state, 'page', 'pack-1', '', 1), 0);
+  assert.equal(beckonRank(state, 'page', 'pack-1', '', 2), -1, 'only page 1 beckons');
+  state.noteWaiting = false;
+  assert.equal(beckonRank(state, 'page', 'pack-1', '', 1), -1, 'a read note stops beckoning');
+});
+
+test('the opening journey beckons the loose axe and pack, and the lighter at the hip', () => {
+  const state = { task: 'escape', potA: '', potB: '', stew: '', placed: 0, mealDone: false, noteWaiting: false, noteStarted: false };
+  assert.ok(beckonRank(state, 'axe', '', '', 0) > 0, 'the axe on its bracket');
+  assert.equal(beckonRank(state, 'axe', 'hip-right', '', 0), -1, 'not once holstered');
+  state.task = 'waystation';
+  assert.ok(beckonRank(state, 'pack', '', '', 0) > 0, 'the pack on the table');
+  state.task = 'light-fire';
+  assert.ok(beckonRank(state, 'lighter', 'hip-left', '', 0) > 0, 'the lighter at the hip');
+  assert.ok(beckonRank(state, 'log', 'pack-2', '', 0) > 0, 'the firewood in the pack');
 });

@@ -1,10 +1,11 @@
 <!--
-  Start panel: the game's name, the story hook, New journey / Continue.
+  Start panel: the game's name, the story hook, New journey / Continue, and the COMFORT
+  chips (settings.ts cycleSetting: the same controls as the journal board and the wrist).
   Code-spawned by src/game/systems/start-system.ts in front of the player's view
   (desktop mouse or XR ray + trigger). Continue is hidden unless a save exists.
   Bundled MSDF fonts are ASCII + Latin-1 only: the em dash in the title is drawn
   as a rule (sm-dash) and runtime text is sanitised.
-  Natural size 80 x ~70 units (cm). Classes are prefixed "sm-".
+  Natural size 80 x ~90 units (cm). Classes are prefixed "sm-".
 -->
 <style>
   .sm-root {
@@ -157,6 +158,53 @@
     cursor: pointer;
   }
   .sm-link:hover { background-color: #2a3a31; }
+  .sm-comfort {
+    display: flex;
+    flex-direction: column;
+    gap: 1;
+    width: 100%;
+    margin-top: 0.4;
+  }
+  .sm-eyebrow {
+    font-size: 2;
+    font-weight: 700;
+    color: #cba875;
+  }
+  .sm-set-row {
+    display: flex;
+    flex-direction: row;
+    gap: 1;
+    width: 100%;
+  }
+  .sm-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 30%;
+    flex-grow: 1;
+    padding-top: 0.8;
+    padding-bottom: 0.9;
+    padding-left: 1.3;
+    padding-right: 0.8;
+    border-radius: 1;
+    border-width: 0.25;
+    border-color: #667567;
+    background-color: #1b2621;
+    cursor: pointer;
+  }
+  .sm-chip:hover { background-color: #2a3a31; }
+  .sm-chip-label {
+    font-size: 2;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #a5b2a5;
+  }
+  .sm-chip-val {
+    font-size: 2.6;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #e2b57a;
+  }
 </style>
 <div id="sm-root" class="sm-root">
   <div class="sm-crest"><Flame class="sm-flame"></Flame></div>
@@ -167,7 +215,7 @@
   </div>
   <div class="sm-rule"></div>
   <span id="sm-lead" class="sm-lead">The night the expedition took the Spire's flame, every fire in the valley went out. All but one.</span>
-  <span id="sm-hook" class="sm-hook">You wake beside a cold fire. You don't remember lying down. There's a note in your pack, in your handwriting.</span>
+  <span id="sm-hook" class="sm-hook">You wake to smoke and red light. The plane is down, and burning. Get out.</span>
   <div class="sm-actions">
     <button id="sm-continue" class="sm-btn" style="display: none">
       <span class="sm-btn-label">Continue</span>
@@ -175,8 +223,20 @@
     </button>
     <button id="sm-new" class="sm-btn">
       <span id="sm-new-label" class="sm-btn-label">New journey</span>
-      <span id="sm-new-sub" class="sm-btn-sub">Wake beside the cold fire</span>
+      <span id="sm-new-sub" class="sm-btn-sub">Wake in the wreck</span>
     </button>
+  </div>
+  <div class="sm-comfort">
+    <span class="sm-eyebrow">COMFORT - TAP TO CHANGE</span>
+    <div class="sm-set-row">
+      <button id="sm-set-speed" class="sm-chip"><span class="sm-chip-label">WALK SPEED</span><span id="sm-set-speed-val" class="sm-chip-val">Normal</span></button>
+      <button id="sm-set-turn" class="sm-chip"><span class="sm-chip-label">TURNING</span><span id="sm-set-turn-val" class="sm-chip-val">Snap 45°</span></button>
+      <button id="sm-set-tunnel" class="sm-chip"><span class="sm-chip-label">TUNNEL</span><span id="sm-set-tunnel-val" class="sm-chip-val">On</span></button>
+    </div>
+    <div class="sm-set-row">
+      <button id="sm-set-flashes" class="sm-chip"><span class="sm-chip-label">REDUCE FLASHES</span><span id="sm-set-flashes-val" class="sm-chip-val">Off</span></button>
+      <button id="sm-set-subs" class="sm-chip"><span class="sm-chip-label">SUBTITLES</span><span id="sm-set-subs-val" class="sm-chip-val">On</span></button>
+    </div>
   </div>
   <div class="sm-foot">
     <span id="sm-help" class="sm-help">Click to choose.</span>

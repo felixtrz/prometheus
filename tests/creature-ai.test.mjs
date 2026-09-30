@@ -226,3 +226,20 @@ test('angular gaps are unsigned and wrap', () => {
   assert.ok(near(ai.angularGap(-1, 1), 2));
   assert.ok(near(ai.angularGap(3, 3), 0));
 });
+
+test('a carcass capsule measures the blade gap along its length and round its girth', () => {
+  // Deer-like capsule: y .22, z -.62 → .55, radius .26.
+  assert.ok(near(ai.capsuleGap(0, .22, 0, .22, -.62, .55, .26), -.26), 'centre is a radius inside');
+  assert.ok(near(ai.capsuleGap(.5, .22, .3, .22, -.62, .55, .26), .24), 'beside the flank');
+  assert.ok(near(ai.capsuleGap(0, .22, 1.05, .22, -.62, .55, .26), .24), 'past the end cap');
+  assert.ok(near(ai.capsuleGap(0, .72, -.62, .22, -.62, .55, .26), .24), 'above the rump');
+});
+
+test('an axe blade butchers only with a brisk, re-armed swing', () => {
+  const blow = (gap, speed, armed) => ai.bladeContact(gap, speed, armed, .08, .3, 1.8);
+  assert.equal(blow(.02, 2.5, true), 'blow');
+  assert.equal(blow(.02, 1.0, true), 'none', 'a slow touch is no blow');
+  assert.equal(blow(.02, 2.5, false), 'none', 'resting the blade in the wound lands nothing more');
+  assert.equal(blow(.2, 2.5, true), 'none', 'a near miss');
+  assert.equal(blow(.4, 0, false), 'rearm', 'pulling back arms the next blow');
+});

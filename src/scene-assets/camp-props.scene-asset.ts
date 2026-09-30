@@ -354,10 +354,14 @@ function makeBench(): THREE.Group {
   return batchStatic(root);
 }
 
+/**
+ * The backpack's slot panel: the canvas sheet that unrolls, upright, from the pack held in a
+ * hand (BackpackSystem). Origin at the centre of its top edge (the roll it hangs from), facing
+ * +Z; nine pockets on a 18 cm grid, centres at x -.18/0/.18 and y -.13/-.31/-.49.
+ */
 function makeBackpack(): THREE.Group {
   const root = new THREE.Group();
-  root.scale.setScalar(0.62); // authored to a plausible ~1.5 m x 1.0 m unrolled footprint
-  root.name = 'Unrolled canvas supply pack';
+  root.name = 'Backpack slot panel';
   // Procedural low-frequency weave and leather grain: cheap, stylized, no photoreal microdetail.
   function weaveTexture(base:[number,number,number], contrast=10, size=64, repeat:[number,number]=[6,4]){
     const data=new Uint8Array(size*size*4);
@@ -367,60 +371,32 @@ function makeBackpack(): THREE.Group {
     }
     const t=new THREE.DataTexture(data,size,size,THREE.RGBAFormat); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(repeat[0],repeat[1]); t.colorSpace=THREE.SRGBColorSpace; return smoothSampling(t);
   }
-  function grainTexture(base:[number,number,number], size=64){
-    const data=new Uint8Array(size*size*4);
-    for(let y=0;y<size;y++) for(let x=0;x<size;x++){
-      const i=(y*size+x)*4; const wave=Math.sin(y*.35)*7+Math.sin((x+y)*.15)*4; const n=((x*13+y*17)%9)-4; const v=wave+n;
-      data[i]=Math.max(0,Math.min(255,base[0]+v)); data[i+1]=Math.max(0,Math.min(255,base[1]+v*.7)); data[i+2]=Math.max(0,Math.min(255,base[2]+v*.5)); data[i+3]=255;
-    }
-    const t=new THREE.DataTexture(data,size,size,THREE.RGBAFormat); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,2); t.colorSpace=THREE.SRGBColorSpace; return smoothSampling(t);
-  }
-  const canvasMap=weaveTexture([176,176,176],12,64,[3.5,2.2]); const leatherMap=grainTexture([176,176,176]);
-  const canvas=mat(new THREE.MeshStandardMaterial({color:0x8a7358,map:canvasMap,roughness:.98}));
-  const canvasMid=mat(new THREE.MeshStandardMaterial({color:0x9c826a,map:canvasMap,roughness:.97}));
-  const canvasLight=mat(new THREE.MeshStandardMaterial({color:0xb59a76,map:canvasMap,roughness:.97}));
+  const canvasMap=weaveTexture([176,176,176],12,64,[2,2]);
+  const canvas=mat(new THREE.MeshStandardMaterial({color:0x9c826a,map:canvasMap,roughness:.97}));
+  const pocket=mat(new THREE.MeshStandardMaterial({color:0x7d6750,map:canvasMap,roughness:.98}));
   const binding=mat(new THREE.MeshStandardMaterial({color:0xc9a86f,roughness:.94}));
-  const leather=mat(new THREE.MeshStandardMaterial({color:0x6b4a34,map:leatherMap,roughness:.90}));
-  const leatherLight=mat(new THREE.MeshStandardMaterial({color:0xa07248,map:leatherMap,roughness:.87}));
+  const leather=mat(new THREE.MeshStandardMaterial({color:0x6b4a34,roughness:.9}));
   const brass=mat(new THREE.MeshStandardMaterial({color:0xc4954f,roughness:.55,metalness:.22}));
-  const wood=mat(new THREE.MeshStandardMaterial({color:0x80502d,roughness:.92}));
-  const woodLight=mat(new THREE.MeshStandardMaterial({color:0xa46c3a,roughness:.88}));
-
-  function chamfer(size:[number,number,number],_r:number,pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root){const mesh=new THREE.Mesh(geo(new THREE.BoxGeometry(size[0],size[1],size[2])),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
-  function box(size:[number,number,number],pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root){const mesh=new THREE.Mesh(geo(new THREE.BoxGeometry(...size)),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
-  function cyl(rt:number,rb:number,h:number,seg:number,pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root){const mesh=new THREE.Mesh(geo(new THREE.CylinderGeometry(rt,rb,h,Math.min(seg,9))),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
-  function torus(r:number,tube:number,pos:[number,number,number],m:THREE.Material,parent:THREE.Object3D=root,arc=Math.PI*2){const mesh=new THREE.Mesh(geo(new THREE.TorusGeometry(r,tube,4,10,arc)),m);mesh.position.set(...pos);parent.add(mesh);return mesh;}
-  // Main unrolled canvas: mostly crisp panels with subtle fold articulation.
-  box([2.40,.045,1.58],[0,.028,0],canvas);
-  for(const [x,m,dy] of [[-.78,canvasMid,.004],[0,canvasLight,0],[.78,canvasMid,-.004]] as [number,THREE.Material,number][]){const p=box([.77,.035,1.54],[x,.060+dy,0],m);p.rotation.z=x*.008;}
-  // Perimeter binding and central fold strips.
-  for(const z of [-.78,.78]) chamfer([2.44,.030,.038],.006,[0,.092,z],binding);
-  for(const x of [-1.20,1.20]) chamfer([.038,.030,1.58],.006,[x,.092,0],binding);
-  for(const x of [-.39,.39]) chamfer([.030,.022,1.52],.005,[x,.092,0],binding);
-
-  const cols=[-.74,0,.74], rows=[-.47,0,.47];
-  for(const x of cols) for(const z of rows){
-    // Pocket is a shallow fabric panel with a folded top lip and stitched edge.
-    box([.61,.024,.38],[x,.128,z],canvas);
-    chamfer([.63,.030,.025],.005,[x,.153,z-.203],binding); chamfer([.63,.030,.025],.005,[x,.153,z+.203],binding);
-    chamfer([.025,.030,.405],.005,[x-.317,.153,z],binding); chamfer([.025,.030,.405],.005,[x+.317,.153,z],binding);
-    box([.52,.024,.032],[x,.169,z+.168],canvasLight);
-    for(const sx of [-1,1]) cyl(.009,.009,.010,10,[x+sx*.245,.178,z+.168],brass);
+  function box(size:[number,number,number],pos:Position,m:THREE.Material){const mesh=new THREE.Mesh(geo(new THREE.BoxGeometry(...size)),m);mesh.position.set(...pos);root.add(mesh);return mesh;}
+  function rod(radius:number,length:number,pos:Position,m:THREE.Material){const mesh=new THREE.Mesh(geo(new THREE.CylinderGeometry(radius,radius,length,9)),m);mesh.position.set(...pos);mesh.rotation.z=Math.PI/2;root.add(mesh);return mesh;}
+  const cols=[-.18,0,.18], rows=[-.13,-.31,-.49];
+  // The sheet, bound at the edges, rolled at the top and weighted at the bottom.
+  box([.58,.6,.008],[0,-.31,-.004],canvas);
+  for(const x of [-.29,.29]) box([.018,.6,.012],[x,-.31,-.002],binding);
+  rod(.028,.62,[0,0,0],leather);
+  rod(.014,.6,[0,-.61,0],leather);
+  for(const x of [-.31,.31]) { rod(.03,.012,[x,0,0],brass); rod(.016,.012,[x,-.61,0],brass); }
+  // Nine pockets: a darker backing, a stitched lip along the bottom and binding up the sides.
+  for(const x of cols) for(const y of rows){
+    box([.16,.16,.006],[x,y,.004],pocket);
+    box([.165,.022,.016],[x,y-.08,.01],binding);
+    for(const sx of [-1,1]) box([.01,.16,.01],[x+sx*.082,y,.006],binding);
+    for(const sx of [-1,1]) { const pin=new THREE.Mesh(geo(new THREE.CylinderGeometry(.006,.006,.008,8)),brass); pin.rotation.x=Math.PI/2; pin.position.set(x+sx*.07,y-.08,.02); root.add(pin); }
   }
-
-  // The roll itself is the separate grabbable 'pack-roll' item (BackpackSystem).
-  // hinge flap from the roll into the inventory mat, with grommets
-  box([.30,.052,1.46],[-1.10,.145,0],leather);
-  for(const z of [-.55,-.28,0,.28,.55]) torus(.022,.008,[-.95,.185,z],brass).rotation.x=Math.PI/2;
-
-  // A small repair patch makes the object feel used without requiring a heavy texture set.
-  box([.22,.012,.16],[.66,.102,.60],leatherLight).rotation.y=-.10;
-  for(const z of [.54,.66]) for(const x of [.58,.74]) cyl(.007,.007,.010,8,[x,.112,z],brass);
-
-  // Two draws: canvas and bindings on the weave; leather, brass and wood on the grain.
+  // Two draws: canvas and bindings on the weave; leather and brass on their own.
   const canvasAll=mat(new THREE.MeshStandardMaterial({vertexColors:true,map:canvasMap,roughness:.97})); canvasAll.name='Pack canvas';
-  const leatherAll=mat(new THREE.MeshStandardMaterial({vertexColors:true,map:leatherMap,roughness:.88})); leatherAll.name='Pack leather and fittings';
-  unify(root,canvasAll,(m)=>m!==canvas&&m!==canvasMid&&m!==canvasLight&&m!==binding);
+  const leatherAll=mat(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,metalness:.1})); leatherAll.name='Pack leather and fittings';
+  unify(root,canvasAll,(m)=>m!==canvas&&m!==pocket&&m!==binding);
   unify(root,leatherAll,(m)=>m===canvasAll);
   return batchStatic(root);
 }

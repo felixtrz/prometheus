@@ -237,11 +237,15 @@ export const BURSTS = {
 /**
  * The current task's steps, in order, whose item beckons: one item at a time, the single
  * next step's. The meal's ingredients come from the pack (meat, then the mushroom), then the
- * spoon stirs and the bowl is dipped and drunk; the torch takes the pack's cloth, then resin.
+ * spoon stirs and the bowl is dipped and drunk; the torch takes the pack's reeds, then resin.
  */
 export const BECKON_STEPS: Readonly<Record<string, readonly string[]>> = {
-  'light-fire': ['lighter'], 'eat-meal': ['meat', 'mushroom', 'spoon', 'bowl'], torch: ['cloth', 'resin'],
+  // The opening journey: the axe on its bracket, the pack on the waystation table (both loose).
+  escape: ['axe'], waystation: ['pack'],
+  'light-fire': ['log', 'lighter'], 'eat-meal': ['meat', 'mushroom', 'spoon', 'bowl'], torch: ['reeds', 'resin'],
 };
+/** Tasks whose steps beckon where they lie loose in the world, not in the pack. */
+const LOOSE_TASKS: ReadonlySet<string> = new Set(['escape', 'waystation']);
 
 /** What the beckon choice reads each tick (FxSystem fills one and reuses it). */
 export type BeckonState = {
@@ -256,25 +260,27 @@ export type BeckonState = {
   mealDone: boolean;
   /** Page 1 (the note in the pack) is unread once the first fire burns. */
   noteWaiting: boolean;
+  /** The shade's 'note' line has started (it points at page 1). */
+  noteStarted: boolean;
 };
-
-/** Page 1's rank while the meal is still to cook: it beckons only when nothing else does. */
-export const PAGE_FALLBACK = 99;
 
 /**
  * Rank of an item in the beckon order (lower goes first; -1 never beckons). The caller lets
- * only the lowest-ranked item beckon. Page 1 comes first once the meal is eaten (the shade's
- * note line points at it), and before that only when no step's item is there to beckon.
+ * only the lowest-ranked item beckon. Page 1 beckons only once the meal is eaten or the shade's
+ * note line has started (it points at the page), and then it comes first.
  */
 export function beckonRank(state: BeckonState, kind: string, slot: string, variant: string, page: number): number {
   const packed = slot.startsWith('pack-');
   if (kind === 'page') {
     if (page !== 1 || !state.noteWaiting || !(packed || slot === '')) return -1;
-    return state.mealDone ? 0 : PAGE_FALLBACK;
+    return state.mealDone || state.noteStarted ? 0 : -1;
   }
   const steps = BECKON_STEPS[state.task];
   const step = steps ? steps.indexOf(kind) : -1;
   if (step < 0) return -1;
+  if (LOOSE_TASKS.has(state.task)) return slot === '' ? 1 + step : -1;
+  // The lighter rides at the hip from the start: it beckons there as well as in the pack.
+  if (state.task === 'light-fire' && kind === 'lighter') return packed || slot.startsWith('hip-') ? 1 + step : -1;
   if (state.task !== 'eat-meal') return packed && (state.placed & (1 << step)) === 0 ? 1 + step : -1;
   const full = state.potA !== '' && state.potB !== '';
   if (kind === 'meat' || kind === 'mushroom') {

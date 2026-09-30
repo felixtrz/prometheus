@@ -1,12 +1,13 @@
 /** Valley environment registry (owned by the world build). */
 import { AssetType } from '@iwsdk/core';
 import { woodland } from './woodland.scene-asset.js';
+import { valleyBroadleaves } from './forest-parts.scene-asset.js';
 import { valleyColliders, walkableGround } from './valley-ground.scene-asset.js';
 import {
   valleyGrove, valleyHorizon, valleyMeadow, valleyOutpost, valleySouth, valleySpire, valleyTrail,
 } from './valley-regions.scene-asset.js';
 import {
-  beaconBrazier, berryBush, brazier, canvasScrap, deadwood, endingSmoke, farPine, flintBed, herbPatch, mushroomPatch, nightSky,
+  beaconBrazier, berryBush, brazier, canvasScrap, endingSmoke, farPine, flintBed, herbPatch, mushroomPatch, nightSky,
   reedClump, resinScar, valleyBounds, valleyPine, valleyPineTall,
 } from './valley-props.scene-asset.js';
 import {
@@ -31,7 +32,6 @@ export const valleyAssets = {
   'valley-south': valleySouth,
   'valley-horizon': valleyHorizon,
   // Resource-node visuals: the source only, one draw each (the grabbable item waits on it).
-  deadwood,
   'resin-scar': resinScar,
   'mushroom-patch': mushroomPatch,
   'berry-bush': berryBush,
@@ -54,10 +54,13 @@ export const valleyAssets = {
   // Sky and finale: stars + moon (materials 'Night stars', 'Moon', opacity 0), and the south smoke column.
   'night-sky': nightSky,
   'ending-smoke': endingSmoke,
-  // Trees: near GLB pines, and single-mesh procedural pines for instanced patterns.
+  // Trees. The scene nodes place them and show them in the editor; at runtime ForestSystem
+  // hides them and draws every tree itself (GLB pines near, octahedral impostors far), so
+  // each can be felled and regrow. The procedural pines are the editor's stand-ins.
   'pine-1': { type: AssetType.GLTF, url: url('models/pine-1.glb') },
   'pine-2': { type: AssetType.GLTF, url: url('models/pine-2.glb') },
   'valley-pine': valleyPine,
   'valley-pine-tall': valleyPineTall,
   'far-pine': farPine,
+  'valley-broadleaves': valleyBroadleaves,
 };

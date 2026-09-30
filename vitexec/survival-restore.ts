@@ -3,19 +3,25 @@
  * the save survival.ts left behind.
  */
 import { GameState } from '/src/game/components.ts';
-import { boot, check, done, enterXR, item, loose, section, state, waitFor } from '/vitexec/lib/harness.ts';
+import { boot, check, done, enterXR, items, packState, section, state, waitFor } from '/vitexec/lib/harness.ts';
 import { beginJourney } from '/vitexec/lib/journey.ts';
 
 await boot();
-section('S15 progress survives a reload');
-check(state(GameState).objectives === 0, 'after a reload the world waits at the start screen (no silent resume)');
-await enterXR();
-await beginJourney('continue');
-const expected = JSON.parse(sessionStorage.getItem('vitexec.survival') ?? 'null');
-check(expected, 'the pre-reload snapshot is available');
-const restored = await waitFor(() => state(GameState).objectives === expected.objectives, 5000);
-const game = state(GameState);
-check(restored && game.pages === expected.pages && game.recipes === expected.recipes,
-  `objectives/pages/recipes restored (${game.objectives}/${game.pages}/${game.recipes})`);
-check(item(loose('meat')).slot === expected.meatSlot, `the pack still holds the meat in ${expected.meatSlot}`);
+if (await section('S15 progress survives a reload')) {
+  check(state(GameState).objectives === 0, 'after a reload the world waits at the start screen (no silent resume)');
+  await enterXR();
+  await beginJourney('continue');
+  const expected = JSON.parse(sessionStorage.getItem('vitexec.survival') ?? 'null');
+  check(expected, 'the pre-reload snapshot is available');
+  const restored = await waitFor(() => state(GameState).objectives === expected.objectives, 5000);
+  const game = state(GameState);
+  check(restored && game.pages === expected.pages && game.recipes === expected.recipes,
+    `objectives/pages/recipes restored (${game.objectives}/${game.pages}/${game.recipes})`);
+  check(packState() === expected.pack, `the pack is ${expected.pack} again`);
+  const stacked = await waitFor(() => items((it) => it.kind === 'stick' && it.slot === expected.stackSlot).length === expected.stack, 5000);
+  check(stacked, `the pack still holds ${expected.stack} sticks stacked in ${expected.stackSlot}`);
+  const hips = items((it) => it.slot.startsWith('hip-')).map((it) => `${it.kind}@${it.slot}`).sort();
+  check(hips.join() === expected.hips.join(), `the holsters still hold ${expected.hips.join(', ')}`);
+}
+
 done('survival-restore');

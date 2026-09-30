@@ -5,8 +5,11 @@ GDD: `source/overview.md`, `vision.md`, `world.md`, `interaction.md`, `art.md`,
 `decisions.md`. The first playable (cook stew, craft and light a torch) is the M0
 baseline and is kept, generalised into the systems below.
 
-**Pitch.** You wake beside a cold campfire in a quiet mountain valley with no memory,
-a lighter, an axe and a tool bench. Every fire in the valley went out the night the
+**Pitch.** You wake in the seat of a burning plane, down in a quiet mountain valley, with
+no memory and a lighter at your hip. Prometheus' shade gets you out (the emergency axe, the
+jammed door), past the Hollow watching from the hills at dawn, to the waystation where your
+pack waits, through the forest where you fell your first firewood, and on to the expedition's
+camp, its cold fire and its tool bench (design/JOURNEY.md). Every fire in the valley went out the night the
 Prometheus Expedition tried to steal the ancient flame of the Spire, and the notes
 your team left reveal what happened. You gather, cook and craft with your hands. Each
 new tool pulls you further from camp, but every fire you make also draws the
@@ -46,10 +49,12 @@ cell) → perform the action (stir, strike, chop, hold in flame) → use the res
 
 | Place | Where (m) | What's there | Beat |
 | --- | --- | --- | --- |
-| Camp | 0, 0 | campfire + pot, bench, pack on trestle, bedroll, stump + axe, lantern | home, cooking, crafting, sleep |
-| Resin Grove | ≈ −17, −11 (west) | old pines with resin blisters, fallen deadwood to chop, mushrooms | fuel, resin, sticks, food |
-| Meadow & Brook | ≈ 16, −15 (east) | open meadow, deer and rabbits, berry bushes, wild herb patches, reeds (cord), flint on the brook bank | hunting, food, flint, cord |
-| Expedition Outpost | ≈ −4, −33 (north, on the trail) | collapsed tent, lookout, salvage crate (trigger, spring), cold brazier | story reveal, crossbow parts |
+| The wreck | ≈ −22, 4 (south-west, below the ridges) | the crashed plane: the keeper's seat, the emergency axe above the jammed door, fires, the torn tail and wing in the furrow | the opening: out of the wreck; the Hollow watch from the hills at dawn |
+| Waystation (outpost 1) | ≈ −28, −6 | lean-to, table with the pack, orange flag; markers lead there and on through the forest | the pack |
+| Camp (outpost 2) | 0, 0 | campfire (cold, no fuel) + pot, bench, trestle, bedroll, chopping stump, lantern; loose sticks, two reed clumps and a resin-scarred pine at the clearing's edge | home, cooking, crafting, sleep |
+| Resin Grove | ≈ −17, −11 (west) | old pines with resin blisters to fell and tap, mushrooms | fuel, resin, sticks, food |
+| Meadow & Brook | ≈ 16, −15 (east) | open meadow, deer and rabbits, berry bushes, wild herb patches, reed clumps, four flint beds on the brook bank | hunting, food, flint, reeds |
+| Expedition Outpost | ≈ −4, −33 (north, on the trail) | collapsed tent, lookout, Rennick's toppled sentry, emptied crates, cold brazier | story reveal (pages 5 and 6); nothing to salvage |
 | The Spire | ≈ 5, −55 (far north ridge) | the pierced stone landmark, beacon brazier at its base | finale |
 
 Steep ridges, dense tree walls and the mountains bound the valley. The trail links camp,
@@ -62,13 +67,13 @@ the outpost and the Spire; side paths lead to the grove and the meadow.
 | M1 | Grab / carry / drop / throw / pass between hands | squeeze, release | Custom near grab (ItemSystem, not IWSDK grabbables): a gold rim and a haptic tick mark the item a hand would take; squeezing snaps it into a per-item hold pose (tool handle in the fist, crossbow level, bowl upright, page facing the eyes); the other hand can squeeze to take it over. A released item falls onto the ground or any prop tagged `ItemSurface` and rests; released fast, it flies ballistically. No physics engine `[ASSUMED]`. |
 | M2 | Backpack | reach over the shoulder + squeeze; release low to unroll; grab the roll to roll up; release at the shoulder to wear | 3×3 cell grid, one item per cell (art.md). The worn pack follows the player. |
 | M3 | Light fire | hold the lighter, pull the trigger to flick, hold the flame to the tinder for 1 s | Opening beat. A lit torch also ignites. |
-| M4 | Fuel | release or toss a log or stick into the fire ring; loose sticks lie around camp and the paths, and three axe blows on any standing tree shake down 2 sticks (every third harvest also a log; the tree rests 120 s); fallen deadwood gives logs | Fuel 0–100 burns down (~5 min, starts at 90). Only wood burns. From stage 2, wolves circling the fire smother it (+0.15 fuel/s each). At 0 the fire goes out and can be relit. |
+| M4 | Fuel | release or toss a log or stick into the fire ring; loose sticks lie around camp and the paths; firewood comes from felling trees (M8) and from fallen deadwood | Fuel 0–100 burns down (~5 min). The camp ring starts empty: a fresh journey brings its first log from the forest. Only wood burns. From stage 2, wolves circling the fire smother it (+0.15 fuel/s each). At 0 the fire goes out and can be relit. |
 | M5 | Cook stew | release 2 food items into the pot, stir 2 turns with the spoon (fire lit), dip the bowl, bring it to the mouth | Value = 1.5 × the ingredients. Named by ingredients. |
 | M6 | Roast / eat raw | hold raw meat in the flame 3 s; bring food to the mouth | Berries +8, raw meat +5, roast +35, stew +45–75. |
-| M7 | Craft | place 3 items in the bench bays (any order), strike the pad 3 times with either face of the hammer head | Recipes from pages. An unknown valid combination also crafts and is learned (experimentation). An invalid combination clanks and doesn't progress. |
-| M8 | Chop | swing the axe into deadwood (3 hits) or a log on the stump | Deadwood → log + 2 sticks. Log on stump → 2 planks. |
-| M9 | Forage | pull resin blisters, mushrooms, berries, reeds (→ cord), flint pebbles | Nodes respawn after ~3 min `[ASSUMED]`. |
-| M10 | Hunt | throw or thrust the spear, or shoot the crossbow, at deer or rabbits | A hit drops meat. Animals flee when you get close. |
+| M7 | Craft | place 3 items in the bench bays (any order), strike the pad 3 times with either face of the hammer head | Pages teach the five products; the four parts (cord, plank, trigger latch, bow limb) are known from the start and listed in the journal. An unknown valid combination also crafts and is learned (experimentation). An invalid combination clanks and doesn't progress. |
+| M8 | Chop | swing the axe into a standing tree (5 blows; every tree can be felled) or a log on the stump | A felled tree topples away from the chopper, breaks into 1–2 logs (firewood) and 2 sticks (3 for a broadleaf), and leaves a stump; after 2 min a sapling sprouts and grows back to a choppable tree over 8 min (felled trees are saved). Pines carrying a resin scar never fall. Deadwood → log + 2 sticks. Log on stump → 2 planks. The same blow breaks the wreck's jammed door (3 blows). |
+| M9 | Forage | pull resin blisters, mushrooms, berries, reeds, flint pebbles | Only raw materials are found: nothing finished lies in the valley. A reed clump gives a bundle of reeds (three per pull, `yields`); nodes respawn after 1.5–3 min `[ASSUMED]`. |
+| M10 | Hunt | throw or thrust the spear, or shoot the crossbow, at deer or rabbits; butcher the carcass with the axe | A kill leaves a carcass; a few axe blows give its meat (the hunt objective completes on the first meat). Animals flee when you get close. |
 | M11 | Torch | hold in the fire to light; hold toward wolves; poke | Stays lit `[ASSUMED]`. A directional ward (v3): it keeps wolves back within 1.85 m in a ±60° cone in front of the flame (plus 0.9 m at the flame). Wolves circle to your back and feint into poke range; touching one with the flame makes it flee. |
 | M12 | Crossbow | hold, pull the trigger to fire a bolt; touch a bolt bundle to it to reload (+4) | Bolts fly ballistically at 30 m/s. |
 | M13 | Sentry | craft the sentry kit, release it low on open ground (camp, outpost, Spire) | Deploys with 3 starter bolts (v3), shows its ammo as bolt tips, and blinks red with a positional dry click when empty. Auto-aims at wolves within 12 m and fires every 1.5 s while loaded (capacity 12). Landed bolts can be picked up and reloaded. |
@@ -84,22 +89,35 @@ the outpost and the Spire; side paths lead to the grove and the meadow.
 
 ### Recipes (bench: 3 bays + 3 hammer strikes)
 
+Only raw materials are gathered: stick, log, resin, flint, reeds and food (meat comes from
+butchering). Every part and tool is made at the bench, three inputs each (the bench has three bays).
+
 | Product | Inputs | Learned from |
 | --- | --- | --- |
-| Torch | stick + cloth + resin | Page 1 (camp pack) |
+| Cord (part) | reeds + reeds + reeds | known from the start |
+| Plank (part) | stick + stick + resin (or split a log on the camp stump: 2 planks) | known from the start |
+| Trigger latch (part) | plank + stick + flint | known from the start |
+| Bow limb (part) | stick + cord + resin | known from the start |
+| Torch | stick + reeds + resin | Page 1 (camp pack) |
 | Spear | stick + flint + cord | Page 2 (camp bench) |
 | Bolt bundle (×6) | stick + stick + flint | Page 4 (brook) |
-| Crossbow | plank + cord + trigger | Page 5 (outpost tent) |
-| Sentry kit | trigger + spring + plank (a second trigger lies at the lookout) | Page 6 (outpost lookout) |
+| Crossbow | plank + bow limb + trigger latch | Page 5 (outpost table) |
+| Sentry kit | log + bow limb + trigger latch | Page 6 (outpost lookout) |
+
+`GameState.recipes` keeps one bit per recipe by its index in `BENCH_RECIPES`: the five products
+keep bits 0–4 (older saves stay valid), the parts follow and are always known (`knownRecipes`).
 
 Cooking (pot): any 2 of meat, mushroom, berries, herb → "Meat & mushroom stew" and so on.
 
 ### Objectives (soft-ordered; the journal and wrist show the current one)
 
+The opening journey first (design/JOURNEY.md): Get out of the wreck. Find your pack at the
+waystation. Firewood and mushrooms (fell a tree, pick a mushroom on the way to camp). Then:
 1. Light the campfire. 2. Cook a meal and eat it. 3. Craft a torch and light it.
-4. Sleep at the bedroll. 5. Craft a spear. 6. Hunt for meat. 7. Find the expedition
+4. Sleep at the bedroll. 5. Craft a spear. 6. Hunt for meat. 7. Find the high
 outpost. 8. Craft the crossbow. 9. Build a sentry to guard camp. 10. Carry fire to the
-Spire and light the beacon.
+Spire and light the beacon. (The journey's three are bits 10–12 of GameState.objectives,
+shown first through OBJECTIVE_ORDER; saves from before the wreck count them done.)
 
 ## Story — The Prometheus Expedition (keeper canon, M6)
 
@@ -119,8 +137,8 @@ Spire and light the beacon.
    released into ash, memory returns.
 7. Prometheus' shade (v3): the Titan who stole fire to give it to everyone walks as an ember-lit
    ghost beside the keeper, whose people took it from everyone. He guides, never commands: one
-   line the first time each thing is done (src/game/voice-lines.ts), holding all but urgent warnings while the
-   Hollow are near, and he says farewell at the Spire and rises away with the embers. His voice is TTS
+   line the first time each thing is done (src/game/voice-lines.ts), and while the
+   Hollow are near he speaks only to keep the keeper alive, or at the beacon. He says farewell at the Spire and rises away with the embers. His voice is TTS
    (Drawcall, voice Charon), generated once via /voice-prep.html; subtitles carry every line.
 
 Seven pages in three voices: page 1 is from "You, before" (in the pack), page 2 Ilse on the 1st day
@@ -128,9 +146,14 @@ Seven pages in three voices: page 1 is from "You, before" (in the pack), page 2 
 the 9th day, "The Kindling" (outpost), page 6 Rennick on the 10th day (lookout), page 7 Ilse on the
 12th day, "Give it back" (Spire). The texts are in `src/game/story.ts`.
 
-Camp is deliberately sparse (v3 feedback): the cold fire ring with its pot, the pack on the
-trestle, the bench, one bedroll, the journal board with the cold lantern, and the stump with the
-axe. A start screen tells the hook before the world starts; Prometheus' shade speaks the
+The outpost is a story place, not a supply depot: Rennick took what the expedition had made
+when he led the others out, so its crates stand empty and the keeper makes every part again
+from what the valley grows (page 6 names the sentry's parts: a carved latch and a bow limb
+lashed to a log). There is no cloth and no iron in the keeper's crafting.
+
+Camp is deliberately sparse (v3 feedback): the cold, empty fire ring with its pot, the bench,
+one bedroll, the journal board with the cold lantern, and the chopping stump; the keeper brings
+the axe from the wreck, the pack from the waystation and the firewood from the forest. A start screen tells the hook before the world starts; Prometheus' shade speaks the
 first-time guidance. The lantern stays cold until the first fire. The ending: "A flame carried." /
 "The valley remembers. So do you." Then "Go home. Your fire is burning."
 
@@ -183,7 +206,7 @@ ember eyes and ember cracks, so they read clearly at night.
 | S1 | Flicking the lighter at the cold fire's tinder lights it; fuel then decreases | ecs query Campfire.lit / fuel over time |
 | S2 | 2 ingredients + stirring (fire lit) → pot ready; the dipped bowl fills; eating raises hunger by the recipe value | ecs query GameState.hunger before/after |
 | S3 | Bench: a known recipe + 3 strikes spawns the product; an unknown valid recipe also crafts and becomes known; an invalid set doesn't progress | ecs find product + GameState.recipes |
-| S4 | Axe: 3 chops on deadwood spawn a log + 2 sticks; forage nodes yield items | ecs find Item kinds |
+| S4 | Axe: 5 blows fell a tree into firewood logs + sticks; forage nodes yield items | ecs find Item kinds |
 | S5 | Pack: released low → unrolled; item over a cell snaps; roll up hides the contents; worn pack follows the player | Backpack.state + child positions |
 | S6 | Fire fuel falls over time; a log raises it; the fire goes out at 0 | Campfire.fuel series |
 | S7 | Hunger falls; starving drains health; death respawns at the bedroll with a lost pack holding the inventory | GameState + LostPack entity |

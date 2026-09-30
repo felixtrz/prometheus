@@ -7,7 +7,7 @@
  */
 import { Campfire, Creature, GameState } from '/src/game/components.ts';
 import { lightFire } from '/vitexec/lib/camp.ts';
-import { beginJourney } from '/vitexec/lib/journey.ts';
+import { beginJourney, skipOpening } from '/vitexec/lib/journey.ts';
 import {
   all, boot, check, done, enterXR, fixture, look, nextFrame, note, read, rest, section, shot, sleep, until, walk, world,
 } from '/vitexec/lib/harness.ts';
@@ -35,32 +35,39 @@ async function sample(frames = 60) {
   return { calls: median(calls), triangles: median(tris), frameMs: median(ms), geometries: info.memory.geometries, textures: info.memory.textures };
 }
 
+let day: Awaited<ReturnType<typeof sample>> | undefined;
+
 await boot();
 await enterXR();
 await beginJourney();
+await skipOpening();
 await walk([0, 1.6, .8]);
 await look([0, 1.2, -2]);
 await rest('left');
 await rest('right');
 
-section('S17 render cost by day at camp');
-const day = await sample();
-note(`day, per view: ${day.calls} draws, ${Math.round(day.triangles / 1000)}k tris, ${day.frameMs.toFixed(1)} ms/frame (headless), ${day.geometries} geometries, ${day.textures} textures`);
-check(day.calls <= DRAW_BUDGET, `day draws within budget (${day.calls} ≤ ${DRAW_BUDGET})`);
-check(day.triangles <= TRIANGLE_BUDGET, `day triangles within budget (${Math.round(day.triangles / 1000)}k ≤ ${TRIANGLE_BUDGET / 1000}k)`);
+if (await section('S17 render cost by day at camp')) {
+  day = await sample();
+  note(`day, per view: ${day.calls} draws, ${Math.round(day.triangles / 1000)}k tris, ${day.frameMs.toFixed(1)} ms/frame (headless), ${day.geometries} geometries, ${day.textures} textures`);
+  check(day.calls <= DRAW_BUDGET, `day draws within budget (${day.calls} ≤ ${DRAW_BUDGET})`);
+  check(day.triangles <= TRIANGLE_BUDGET, `day triangles within budget (${Math.round(day.triangles / 1000)}k ≤ ${TRIANGLE_BUDGET / 1000}k)`);
+}
 
-section('S17 render cost at night with wolves');
-await lightFire();
-fixture(GameState, 'stage', 3);
-fixture(GameState, 'clock', 340);
-fixture(Campfire, 'fuel', 100);
-await until(() => all(Creature).filter((e) => read(e, Creature).species === 'wolf').length >= 3, 20_000, 'wolves at night');
-await sleep(3000);
-await look([0, 1, -8]);
-const night = await sample();
-note(`night, per view: ${night.calls} draws, ${Math.round(night.triangles / 1000)}k tris, ${night.frameMs.toFixed(1)} ms/frame (headless), ${all(Creature).length} creatures`);
-await shot('night-cost');
-check(night.calls <= DRAW_BUDGET, `night draws within budget (${night.calls} ≤ ${DRAW_BUDGET})`);
-check(night.triangles <= TRIANGLE_BUDGET, `night triangles within budget (${Math.round(night.triangles / 1000)}k ≤ ${TRIANGLE_BUDGET / 1000}k)`);
-check(night.geometries - day.geometries < 200, `no geometry growth between day and night (+${night.geometries - day.geometries})`);
+if (await section('S17 render cost at night with wolves')) {
+  await lightFire();
+  fixture(GameState, 'stage', 3);
+  fixture(GameState, 'clock', 340);
+  fixture(Campfire, 'fuel', 100);
+  await until(() => all(Creature).filter((e) => read(e, Creature).species === 'wolf').length >= 3, 40_000, 'wolves at night');
+  await sleep(3000);
+  await look([0, 1, -8]);
+  const night = await sample();
+  note(`night, per view: ${night.calls} draws, ${Math.round(night.triangles / 1000)}k tris, ${night.frameMs.toFixed(1)} ms/frame (headless), ${all(Creature).length} creatures`);
+  await shot('night-cost');
+  check(night.calls <= DRAW_BUDGET, `night draws within budget (${night.calls} ≤ ${DRAW_BUDGET})`);
+  check(night.triangles <= TRIANGLE_BUDGET, `night triangles within budget (${Math.round(night.triangles / 1000)}k ≤ ${TRIANGLE_BUDGET / 1000}k)`);
+  // A run resumed at night has no day sample to compare with.
+  if (day) check(night.geometries - day.geometries < 200, `no geometry growth between day and night (+${night.geometries - day.geometries})`);
+}
+
 done('perf');

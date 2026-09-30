@@ -54,8 +54,10 @@ test('the Titan speaks world verbs: controller parts live only in the subtitle h
     assert.equal(input.text, l.text, `${l.id}: only the words are sent for speech`);
     if (l.hint) assert.ok(!input.text.includes(l.hint), `${l.id}: the hint is never spoken`);
   }
-  assert.match(line('intro').text, /close your hand/i);
-  assert.match(line('intro').hint, /grip/i);
+  assert.match(line('intro').text, /to the door/i);
+  assert.match(line('intro').hint, /stick/i);
+  assert.match(line('wreck-axe').text, /close your hand/i);
+  assert.match(line('wreck-axe').hint, /grip/i);
   assert.match(line('lighter').hint, /trigger/i);
   assert.match(line('sleep').hint, /bedroll/);
 });
@@ -133,9 +135,11 @@ const SAMPLES = [
   { type: 'bench-set', product: '', valid: false, known: false },
   ...recipes.BENCH_RECIPES.map((recipe) => ({ type: 'crafted', product: recipe.product, learned: false, ...P })),
   ...story.PAGES.map((page) => ({ type: 'page', index: page.index, first: true })),
-  { type: 'chop', node: 'deadwood', remaining: 2, ...P },
+  { type: 'chop', node: 'tree', remaining: 2, ...P },
   { type: 'torch-lit', ...P },
   { type: 'harvest', kind: 'resin', ...P },
+  { type: 'harvest', kind: 'reeds', ...P },
+  { type: 'hit', kind: 'spear', species: 'deer', killed: true, ...P },
   { type: 'pack', state: 'worn', ...P },
   { type: 'phase', phase: 'dusk', day: 1 },
   { type: 'creature', species: 'wolf', cue: 'howl', ...P },
@@ -147,6 +151,10 @@ const SAMPLES = [
   { type: 'toast', tone: 'info', text: 'The beacon stays cold', body: 'Something is missing.' },
   { type: 'beacon', progress: 0.1, lit: false },
   { type: 'ending-step', step: 'smoke' },
+  { type: 'harvest', kind: 'mushroom', ...P },
+  // The opening journey's beats and cues (JourneySystem).
+  ...['wake', 'door', 'armed', 'open', 'outside', 'dawn', 'waystation', 'forest', 'camp', 'done',
+    'door-glance', 'axe-left', 'pack-left', 'forest-done'].map((step) => ({ type: 'journey', step })),
 ];
 
 const produced = new Set(SAMPLES.flatMap((event) => voice.triggersOf(event)));
@@ -180,7 +188,9 @@ test('triggers cover every first-time interaction and story beat the guide must 
     'sentry-deployed', 'sentry-empty', 'crossbow-empty', 'pack:worn', 'sleep-ready', 'beacon', 'ending-step:smoke',
   ];
   for (const key of required) assert.ok(heard.has(key), `no line for ${key}`);
-  assert.deepEqual(new Set(recipes.BENCH_RECIPES.map((r) => r.product)).size, 5);
+  assert.equal(new Set(recipes.BENCH_RECIPES.map((r) => r.product)).size, recipes.BENCH_RECIPES.length);
+  assert.equal(recipes.BENCH_RECIPES.filter((r) => !r.part).length, 5, 'five products; the rest are parts');
+  for (const key of ['harvest:reeds', 'kill:prey']) assert.ok(heard.has(key), `no line for ${key}`);
 });
 
 test('the intro opens a new journey with a how-to inside ~10 s; the welcome repeats; the farewell ends it', () => {
@@ -190,15 +200,17 @@ test('the intro opens a new journey with a how-to inside ~10 s; the welcome repe
   const start = intro.on.map((t) => voice.parseTrigger(t)).find((t) => t.key === 'journey:new');
   assert.ok(start, 'the intro starts the journey');
   // Delay + fade-in (~1 s) + the words up to the how-to: it lands within ~10 s of journey-begin.
-  const howTo = intro.text.search(/close your hand/i);
-  assert.ok(howTo >= 0, 'the intro teaches the first grab');
-  const upTo = intro.text.slice(0, howTo + 'close your hand on the lighter'.length);
+  // In the wreck the first how-to is to walk: up, and to the door.
+  const howTo = intro.text.search(/to the door/i);
+  assert.ok(howTo >= 0, 'the intro sends the keeper to the door');
+  const upTo = intro.text.slice(0, howTo + 'to the door'.length);
   assert.ok(start.delay + 1 + voice.estimateSeconds(upTo) <= 10, 'the first how-to comes within ~10 s');
   assert.ok(voice.estimateSeconds(intro.text) <= 10, 'the opener is short');
   assert.doesNotMatch(intro.text, /Prometheus|stole/, 'no lore monologue before the first how-to');
   assert.ok(intro.covers.includes('key:opening'), 'the opening toast never overlaps the intro');
   const grab = line('grab');
   assert.equal(grab.unless, 'grabbed');
+  assert.ok(grab.on.includes('done:wreck-axe+6'), 'the grab how-to follows the axe line');
   assert.ok(!grab.on.includes('grab'), 'grab is taught before the first grab, not after it');
   const welcome = line('welcome');
   assert.ok(welcome.repeat && welcome.on.some((t) => voice.parseTrigger(t).key === 'journey:resumed'));
@@ -272,6 +284,10 @@ test('events map to trigger keys, ignoring the ones that teach nothing', () => {
   assert.deepEqual(keys({ type: 'page', index: 2, first: false }), []);
   assert.deepEqual(keys({ type: 'page', index: 5, first: true }), ['page', 'page:5']);
   assert.deepEqual(keys({ type: 'creature', species: 'deer', cue: 'flee', ...P }), []);
+  assert.deepEqual(keys({ type: 'harvest', kind: 'reeds', ...P }), ['harvest', 'harvest:reeds']);
+  assert.deepEqual(keys({ type: 'hit', kind: 'spear', species: 'deer', killed: true, ...P }), ['kill:prey']);
+  assert.deepEqual(keys({ type: 'hit', kind: 'spear', species: 'deer', killed: false, ...P }), [], 'a wound teaches nothing');
+  assert.deepEqual(keys({ type: 'hit', kind: 'bolt', species: 'wolf', killed: true, ...P }), [], 'wolves leave no carcass');
   assert.deepEqual(keys({ type: 'beacon', progress: 1, lit: true }), []);
   assert.deepEqual(keys({ type: 'beacon', progress: 0, lit: false }), []);
   assert.deepEqual(keys({ type: 'toast', text: 'x', tone: 'info' }), []);
@@ -281,7 +297,7 @@ test('events map to trigger keys, ignoring the ones that teach nothing', () => {
   assert.deepEqual(keys({ type: 'well-fed', seconds: 90 }), ['well-fed']);
   assert.deepEqual(keys({ type: 'well-fed', seconds: 0 }), [], 'wearing off teaches nothing');
   const out = ['stale'];
-  assert.equal(voice.triggersOf({ type: 'chop', node: 'deadwood', remaining: 1, ...P }, out), out, 'reuses the out array');
+  assert.equal(voice.triggersOf({ type: 'chop', node: 'tree', remaining: 1, ...P }, out), out, 'reuses the out array');
   assert.deepEqual(out, ['chop']);
   assert.deepEqual(voice.parseTrigger('done:intro+0.5'), { key: 'done:intro', delay: 0.5 });
   assert.deepEqual(voice.parseTrigger('crafted:sentry-kit'), { key: 'crafted:sentry-kit', delay: 0 });
@@ -344,17 +360,20 @@ test('objective hints name every source; wrist hints keep their verbs in two lin
   assert.match(hint('spear'), /reeds/);
   assert.match(hint('hunt'), /meadow/);
   assert.match(hint('outpost'), /main trail/);
-  assert.match(hint('crossbow'), /outpost crate/);
-  assert.match(hint('crossbow'), /camp stump/);
-  assert.match(hint('sentry'), /lookout/);
-  assert.match(hint('sentry'), /outpost crate/);
+  assert.match(hint('torch'), /reeds/);
+  assert.match(hint('spear'), /three reeds into cord/);
+  assert.match(hint('hunt'), /butcher it with your axe/);
+  for (const part of ['limb', 'latch', 'camp stump']) assert.match(hint('crossbow'), new RegExp(part), `crossbow hint: ${part}`);
+  assert.match(hint('sentry'), /log/);
+  // Nothing finished lies in the valley: no hint sends the keeper to salvage.
+  for (const o of story.OBJECTIVES) assert.doesNotMatch(`${o.hint} ${o.wrist}`, /crate|salvage|spring|cloth/i, `${o.id} points at salvage`);
   assert.match(hint('beacon'), /torch/);
   for (const o of story.OBJECTIVES) {
     assert.ok(o.wrist.length > 0 && o.wrist.length <= 64, `${o.id} wrist hint is ${o.wrist.length} chars`);
     assert.ok(o.hint.length <= 130, `${o.id} hint is ${o.hint.length} chars`);
   }
   const sentryWrist = story.OBJECTIVES.find((o) => o.id === 'sentry').wrist;
-  for (const part of ['Bench', 'trigger', 'spring', 'plank', 'crate', 'lookout']) assert.match(sentryWrist, new RegExp(part), `sentry wrist: ${part}`);
+  for (const part of ['Bench', 'log', 'limb', 'latch']) assert.match(sentryWrist, new RegExp(part), `sentry wrist: ${part}`);
   // Every page that teaches a recipe says where it lies (the journal's teaser).
   for (const page of story.PAGES) assert.ok(page.where && page.where.length <= 28, `page ${page.index} where`);
   // Page 7 asks for what the beacon accepts: a lit torch.

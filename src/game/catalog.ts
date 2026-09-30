@@ -42,12 +42,12 @@ export const ITEMS = {
   stick: { asset: 'stick', label: 'Stick', fuel: 10, lie: 'side', restY: .045, hold: { frame: 'tool' } },
   log: { asset: 'log', label: 'Firewood', fuel: 35, lie: 'side', restY: .081, hold: { frame: 'tool' } },
   plank: { asset: 'plank', label: 'Plank', lie: 'side', restY: .019, hold: { frame: 'tool', at: [0, -.08, 0] } },
-  cloth: { asset: 'cloth', label: 'Cloth', lie: 'flat', restY: .112, hold: { frame: 'level' } },
   resin: { asset: 'resin', label: 'Resin', lie: 'upright', restY: .04, hold: { frame: 'level' } },
   flint: { asset: 'flint', label: 'Flint', lie: 'flat', restY: .018, hold: { frame: 'level' } },
+  reeds: { asset: 'reeds', label: 'Reeds', lie: 'side', restY: .024, hold: { frame: 'tool' } },
   cord: { asset: 'cord', label: 'Cord', lie: 'flat', restY: .02, hold: { frame: 'level' } },
-  trigger: { asset: 'trigger', label: 'Trigger mechanism', lie: 'flat', restY: .019, hold: { frame: 'level', at: [0, 0, .03] } },
-  spring: { asset: 'spring', label: 'Iron spring', lie: 'flat', restY: .029, hold: { frame: 'level' } },
+  trigger: { asset: 'trigger', label: 'Trigger latch', lie: 'flat', restY: .021, hold: { frame: 'level', at: [0, 0, .03] } },
+  limb: { asset: 'limb', label: 'Bow limb', lie: 'side', restY: .021, hold: { frame: 'tool' } },
   // variant 'roast' after 3 s in the flame (ROAST_FOOD); the prototype holds both looks.
   meat: { asset: 'meat', label: 'Raw meat', food: 5, stew: 25, lie: 'flat', restY: .036, hold: { frame: 'level', at: [.02, 0, 0] } },
   mushroom: { asset: 'mushroom', label: 'Mushroom', food: 6, stew: 15, lie: 'upright', restY: .104, hold: { frame: 'level', at: [0, -.05, 0] } },
@@ -84,3 +84,10 @@ export const VARIANT_NODES = { meat: ['raw', 'roast'], 'sentry-kit': ['kit', 'de
 
 /** Tools stay with the player: they never burn or cook when released near fire. */
 export const TOOLS: ReadonlySet<string> = new Set(['spoon', 'hammer', 'axe', 'lighter', 'bowl', 'crossbow', 'spear', 'sentry-kit', 'page']);
+
+/** Most of one kind a backpack slot holds; the slot shows the count instead of copies. */
+export const STACK_LIMIT = 20;
+/** Items with their own state or role (a lit torch, a charged bundle, the pack) never stack. */
+const UNSTACKABLE: ReadonlySet<string> = new Set(['torch', 'bolts', 'pack']);
+/** Materials and food stack in a backpack slot (same kind and variant); tools never do. */
+export const stackable = (kind: string) => !TOOLS.has(kind) && !UNSTACKABLE.has(kind);

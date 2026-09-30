@@ -8,6 +8,7 @@ import { objectiveIndex, PAGES, STAGE_BY_PRODUCT } from '../story.js';
 import { beaconRate, FINALE } from '../rules.js';
 import { LANDMARKS } from '../terrain.js';
 import { CreatureSystem } from './creature-system.js';
+import { ForestSystem } from './forest-system.js';
 import { ItemSystem } from './item-system.js';
 
 const TORCH_TIP = new Vector3(...ITEMS.torch.tip);
@@ -126,9 +127,14 @@ export class StorySystem extends createSystem({
       bus.on('torch-lit', complete('torch')),
       bus.on('sleep', complete('sleep')),
       bus.on('hit', (event) => {
-        if (event.killed && (event.species === 'deer' || event.species === 'rabbit')) this.complete('hunt');
         if (event.killed && event.species === 'wolf') this.slain++;
+        // Until the first meat is cut, every kill says how: the carcass waits for the axe.
+        if (event.killed && (event.species === 'deer' || event.species === 'rabbit') && !this.done('hunt')) {
+          bus.emit({ type: 'toast', tone: 'info', text: 'Butcher it with your axe', body: 'A few firm blows give its meat. Left alone, it rots away.' });
+        }
       }),
+      // The hunt ends with meat in hand: the kill's carcass butchered with the axe.
+      bus.on('harvest', (event) => { if (event.kind === 'meat') this.complete('hunt'); }),
       // A bite during the hold knocks the flame back.
       bus.on('hurt', (event) => { if (event.cause === 'wolf' && this.beaconAnnounced) this.setback += FINALE.biteSetback; }),
       bus.on('sentry-deployed', complete('sentry')),
@@ -187,6 +193,11 @@ export class StorySystem extends createSystem({
   private bump(): void {
     const game = this.state;
     if (game) game.setValue(GameState, 'revision', (game.getValue(GameState, 'revision') ?? 0) + 1);
+  }
+
+  /** Whether an objective is complete. */
+  private done(id: string): boolean {
+    return ((this.state?.getValue(GameState, 'objectives') ?? 0) & (1 << objectiveIndex(id))) !== 0;
   }
 
   complete(id: string): void {
@@ -541,6 +552,7 @@ export class StorySystem extends createSystem({
       },
       pack: this.hooks.pack?.save() ?? null,
       items: saved, consumed: [...items.consumedUids], nodes, beacons, sentries,
+      trees: this.world.getSystem(ForestSystem)?.snapshot() ?? [],
     });
   }
 
@@ -647,6 +659,7 @@ export class StorySystem extends createSystem({
         entity.setValue(ResourceNode, 'hits', node.hits);
       }
     });
+    section('felled trees', () => this.world.getSystem(ForestSystem)?.restore(save.trees));
     section('beacons', () => {
       for (const beacon of save.beacons) {
         const entity = this.world.getSceneEntity(beacon.id);

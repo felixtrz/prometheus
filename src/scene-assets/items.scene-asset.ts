@@ -544,32 +544,6 @@ function makeStick(): Group {
   return bake(root);
 }
 
-/** Bound linen roll, lying along X. r .105, length .33 (unchanged). */
-function makeCloth(): Group {
-  const root = group('Bound cloth roll');
-  const radiusAt = (x: number) => .1025 + x * (.005 / .33);
-  const body = tiled(cyl(.10, .105, .33, 16, C.linen, .05), .65, .33);
-  put(root, body, fibreMat, [0, 0, 0], [0, 0, Math.PI / 2]);
-  // Madder-red hem stripes and the loose outer edge of the wrap.
-  for (const x of [-.132, -.118, .118, .132]) {
-    put(root, tiled(cyl(radiusAt(x) + .0015, radiusAt(x) + .0015, .007, 16, C.madder, .03, 1, true), .65, .01), fibreMat, [x, 0, 0], [0, 0, Math.PI / 2]);
-  }
-  put(root, box([.33, .004, .034], C.linenShade), fibreMat, [0, Math.cos(.75) * .104, Math.sin(.75) * .104], [.75, 0, 0]);
-  // Rolled layers on both ends.
-  for (const side of [-1, 1]) {
-    const x = side * .1652;
-    put(root, tint(new CylinderGeometry(.097, .097, .002, 16), 0xa89777), fibreMat, [x, 0, 0], [0, 0, Math.PI / 2]);
-    put(root, sweep(spiral(x + side * .0015, .01, .094, 3.4, 40), { radius: .0036, radial: 4, paint: 0xe4d8b8, tile: .03 }), fibreMat);
-  }
-  // Twine ties with a knot on top.
-  for (const x of [-.09, .09]) {
-    put(root, cordRing(radiusAt(x) + .004, .0055, C.twine, 18), fibreMat, [x, 0, 0], [0, Math.PI / 2, 0]);
-    put(root, ball(.009, 6, 4, C.twineDark), fibreMat, [x, radiusAt(x) + .008, 0]);
-    put(root, cyl(.003, .003, .03, 4, C.twine), fibreMat, [x + .008, radiusAt(x) + .004, .012], [.5, 0, -1.1]);
-  }
-  return bake(root);
-}
-
 /** Carved cooking spoon; bowl tip at (0,-.28,0), bowl opening toward +X so it rests bowl-up. */
 function makeSpoon(): Group {
   const root = group('Long wooden cooking spoon');
@@ -628,21 +602,17 @@ function makeTorch(): Group {
   // Twine grip: a whipped sleeve with a raised turn at each end.
   put(root, tiled(cyl(.0428, .0438, .12, 12, C.twine, .05, 1, true), .27, .12, .03), fibreMat, [0, -.06, 0]);
   for (const y of [-.12, 0]) put(root, cordRing(.043, .006, C.twineDark, 12), fibreMat, [0, y, 0], [Math.PI / 2, 0, 0]);
-  // Resin-soaked cloth head, darker and charred toward the top.
-  const head = cyl(.082, .06, .15, 12, (x, y, z) => {
-    const fold = Math.sin(Math.atan2(z, x) * 5 + y * 40);
-    return mixHex(mixHex(0x8a7355, 0x3b2d22, smoothstep(-.05, .075, y)), 0x5b4633, .3 + .3 * fold);
-  }, .05, 3);
-  const hp = head.getAttribute('position');
-  for (let i = 0; i < hp.count; i++) {
-    const x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i);
-    const bulge = 1 + .05 * Math.sin(Math.atan2(z, x) * 5 + y * 40);
-    hp.setXYZ(i, x * bulge, y, z * bulge);
+  // Resin-soaked reed head: a pitch-dark core ringed by reed stems bound to the shaft,
+  // straw-gold below and charred toward the top.
+  put(root, cyl(.064, .052, .15, 10, (_x, y) => mixHex(0x5b4633, 0x2e231a, smoothstep(-.05, .075, y)), .05), organicMat, [0, .285, 0]);
+  for (let k = 0; k < 22; k++) {
+    const a = k / 22 * TAU + (k % 2) * .05, r = .06 + (k % 3) * .003;
+    const straw = mixHex(0xb49a58, 0x8f7b43, hash(k * 1.9));
+    put(root, cyl(.0092, .0104, .17 - (k % 3) * .012, 5, (_x, y) => mixHex(straw, 0x33271c, smoothstep(-.02, .08, y)), .05), organicMat,
+      [Math.cos(a) * r, .29, Math.sin(a) * r], [Math.sin(a) * .05, 0, -Math.cos(a) * .05]);
   }
-  head.computeVertexNormals();
-  put(root, tiled(head, .5, .15), fibreMat, [0, .285, 0]);
-  for (const y of [.235, .27, .305, .34]) put(root, cordRing(.074 + (y - .23) * .045, .0085, C.twineDark, 12), fibreMat, [0, y, 0], [Math.PI / 2, 0, 0]);
-  put(root, torus(.058, .012, C.ironDark), metalMat, [0, .21, 0], [Math.PI / 2, 0, 0]);
+  for (const y of [.245, .315]) put(root, cordRing(.075 + (y - .23) * .02, .0075, C.twineDark, 14), fibreMat, [0, y, 0], [Math.PI / 2, 0, 0]);
+  put(root, cordRing(.056, .01, C.twine, 12), fibreMat, [0, .21, 0], [Math.PI / 2, 0, 0]);
   // Resin drips run down from the head.
   for (const [a, y, s] of [[.6, .22, 1], [2.9, .235, .8], [4.4, .215, .9]]) {
     put(root, ball(.013 * s, 8, 6, (_x, py) => mixHex(0xa7520f, 0xf0a13c, py / .02 + .5)), amberMat, [Math.cos(a) * .062, y, Math.sin(a) * .062], [0, 0, 0], [.8, 1.6, .8]);
@@ -683,6 +653,8 @@ function makeStewBowl(): Group {
   bits.forEach(([x, z, color, s], i) => {
     put(contents, tint(new IcosahedronGeometry(.022 * s, 0), color, .06), organicMat, [x, .058, z], [i, i * 2, 0], [1, .6, 1]);
   });
+  // Empty until filled: ItemSystem.applyVariant shows the contents for a stew variant.
+  contents.visible = false;
   root.add(contents);
   return bake(root);
 }
@@ -956,60 +928,93 @@ function makeCord(): Group {
   return bake(root);
 }
 
-/** Salvaged iron crossbow lock: housing, brass nut with string ears, pins and trigger lever. Lies flat. */
+/**
+ * Carved trigger latch (plank, stick and flint at the bench): a pegged wooden housing
+ * with a turned wooden nut and its two string ears, a knapped flint sear set in pitch,
+ * and a stick lever swinging back, all bound with cord. Lies flat.
+ */
 function makeTrigger(): Group {
-  const root = group('Crossbow trigger mechanism');
-  put(root, box([.022, .03, .062], C.iron, .06), metalMat, [0, 0, 0]);
-  // Side windows showing the sear, and worn edges.
-  for (const x of [-.0112, .0112]) put(root, box([.001, .012, .028], 0x1e2326, 0), metalMat, [x, .002, .006]);
-  put(root, box([.023, .004, .064], C.ironLight, .03), metalMat, [0, .0145, 0]);
-  // Brass nut (the catch) with its two ears.
-  put(root, cyl(.0135, .0135, .026, 12, C.brass), metalMat, [0, .014, -.017], [0, 0, Math.PI / 2]);
-  for (const x of [-.008, .008]) put(root, box([.005, .018, .008], C.brass), metalMat, [x, .03, -.022], [.25, 0, 0]);
-  put(root, box([.004, .008, .008], C.brassDark), metalMat, [0, .026, -.006], [-.3, 0, 0]);
-  // Axle pins with peened heads.
-  for (const z of [-.017, .018]) {
-    put(root, cyl(.0035, .0035, .03, 6, C.ironLight), metalMat, [0, z < 0 ? .014 : -.003, z], [0, 0, Math.PI / 2]);
-    for (const x of [-.0155, .0155]) put(root, ball(.0048, 8, 4, C.steel), metalMat, [x, z < 0 ? .014 : -.003, z], [0, 0, 0], [.5, 1, 1]);
+  const root = group('Carved trigger latch');
+  const housing = box([.024, .03, .07], (_x, y, _z, nx, ny) => (Math.abs(ny) > .9 ? (y > 0 ? 0xb58454 : 0x8f5e38) : Math.abs(nx) > .9 ? 0xa06d42 : 0x9a6a40), .07, [1, 2, 4]);
+  put(root, faceted(housing), woodMat, [0, 0, 0]);
+  // Knife-cut chamfers along the top edges.
+  for (const x of [-.0115, .0115]) put(root, box([.002, .003, .066], 0xc99a62, .03), woodMat, [x, .0148, 0]);
+  // Turned wooden nut (the catch) with its two string ears.
+  put(root, cyl(.0135, .0135, .027, 10, C.woodPale), woodMat, [0, .014, -.019], [0, 0, Math.PI / 2]);
+  for (const x of [-.008, .008]) put(root, box([.005, .018, .008], C.wood), woodMat, [x, .03, -.024], [.25, 0, 0]);
+  // Flint sear chip seated in black pitch behind the nut.
+  put(root, ball(.0075, 8, 5, 0x2b1a0e, .03), woodMat, [0, .0155, .0], [0, 0, 0], [1.3, .5, 1.1]);
+  put(root, faceTint(faceted(new IcosahedronGeometry(.0075, 0)), (f) => [0x46525f, 0x5d6b79, 0x39434e][f % 3]), stoneMat, [0, .019, .001], [.4, .8, 0], [1, .55, 1.4]);
+  // Hardwood pegs through the housing.
+  for (const z of [-.019, .02]) {
+    const y = z < 0 ? .014 : -.003;
+    put(root, cyl(.0034, .0034, .03, 6, C.walnut), woodMat, [0, y, z], [0, 0, Math.PI / 2]);
+    for (const x of [-.0155, .0155]) put(root, cyl(.0042, .0042, .002, 6, C.woodDark), woodMat, [x, y, z], [0, 0, Math.PI / 2]);
   }
-  // Long trigger lever swinging back from the housing.
-  put(root, sweep(pathOf(6, (t) => [0, -.004 - .006 * t + .003 * Math.sin(t * Math.PI), .018 + t * .075]), {
-    radius: (t) => [.0065 - .0015 * t, .0042], radial: 6, caps: true, up: [0, 1, 0], paint: 0x51595e,
-  }), metalMat);
-  put(root, torus(.006, .0022, C.ironDark, 10, 4), metalMat, [0, -.011, .098], [0, Math.PI / 2, 0]);
-  // Leaf spring under the housing.
-  put(root, box([.012, .0025, .05], 0x5e676c, .02), metalMat, [0, -.0158, -.004], [.05, 0, 0]);
+  // The lever: a trimmed stick swinging back from under the housing.
+  put(root, sweep(pathOf(6, (t) => [0, -.006 - .006 * t + .003 * Math.sin(t * Math.PI), .02 + t * .078]), {
+    radius: (t) => [.0058 - .0012 * t, .0052 - .001 * t], radial: 6, caps: true, capPaint: C.sap, up: [0, 1, 0],
+    paint: (t) => mixHex(C.bark, 0x77583d, .5 + .5 * Math.sin(t * 29)),
+  }), woodMat);
+  // Cord lashings round the housing, and a whipped grip on the lever.
+  for (const z of [-.004, .027]) put(root, cordRing(.0205, .0026, C.twine, 12, TAU, 4), fibreMat, [0, 0, z], [0, 0, 0], [.62, .78, 1]);
+  put(root, cordRing(.0062, .0022, C.twineDark, 10, TAU, 3), fibreMat, [0, -.0118, .084], [0, 0, 0]);
   return bake(root);
 }
 
-/** Coiled iron spring on its side (axis X) with a hook loop at each end. */
-function buildSpring(parent: Object3D, material: Material, at: V3, rotation: V3, o: { length: number; radius: number; wire: number; turns: number; perTurn: number; radial: number; hook?: number }): void {
-  const { length, radius, wire, turns } = o;
-  const coilCount = Math.round(turns * o.perTurn);
-  const helix = pathOf(coilCount, (t) => {
-    const a = t * turns * TAU;
-    return [-length / 2 + length * t, Math.cos(a) * radius, Math.sin(a) * radius];
+/**
+ * Cut reeds: a bundle of green-gold stems along Y with a few leaf tips at the top,
+ * tied twice with twine. Lies on its side (bundle radius about .024).
+ */
+function makeReeds(): Group {
+  const root = group('Bundle of cut reeds');
+  const stems: [number, number, number][] = [
+    [0, 0, 0], [.011, .004, .03], [-.01, .007, -.02], [.004, -.011, -.03], [-.006, -.008, .02],
+    [.012, -.006, -.01], [-.012, .002, .012], [.001, .012, .04], [-.003, .001, -.045],
+  ];
+  stems.forEach(([x, z, dy], k) => {
+    const length = .44 + hash(k * 2.3) * .06;
+    const color = mixHex(0x8f9a4c, 0xc2b36c, hash(k * 5.1));
+    put(root, cyl(.0042, .0056, length, 5, (_px, py) => mixHex(color, 0x6f7a36, smoothstep(-.1, .25, py) * .5), .05), organicMat, [x, dy, z], [z * 1.1, 0, -x * 1.1]);
+    // A darker joint ring part way up each stem.
+    put(root, cyl(.0052, .0052, .006, 5, 0x5f6a2e, .03), organicMat, [x, dy - .06 + hash(k * 3.7) * .12, z], [z * 1.1, 0, -x * 1.1]);
   });
-  // End loop in the XY plane just beyond the coil, entered from its top.
-  const hook = (x0: number, dir: number): Vector3[] => {
-    const cx = x0 + dir * radius * .85, rho = radius * .8;
-    return pathOf(o.hook ?? 10, (t) => {
-      const a = Math.PI / 2 - t * 1.8 * Math.PI;
-      return [cx + dir * rho * Math.cos(a), rho * Math.sin(a), 0];
-    });
-  };
-  const start = hook(-length / 2, -1).reverse();
-  const finish = hook(length / 2, 1);
-  const path = [...start, ...helix, ...finish];
-  const mesh = put(parent, sweep(path, {
-    radius: wire, radial: o.radial, caps: true,
-    paint: (t) => mixHex(0x535b60, C.rust, smoothstep(.75, 1, Math.sin(t * 57) * .5 + .5) * .6),
-  }), material, at, rotation);
-  mesh.name = '';
+  // Leaf tips splaying from the top (in the YZ plane, so the bundle still lies flat).
+  for (const [tilt, y, length] of [[.35, .17, .13], [-.3, .19, .11], [.12, .2, .09]]) {
+    put(root, leaf(length, .018, 0x7d8a3c, 0xa9b56a, { fold: .6, segments: 5, edge: 0x5d6a2c }), leafMat, [0, y, 0], [tilt, 0, Math.PI / 2]);
+  }
+  for (const y of [-.12, .09]) {
+    put(root, cordRing(.02, .0034, C.twine, 14), fibreMat, [0, y, 0], [Math.PI / 2, 0, 0]);
+    put(root, ball(.004, 6, 4, C.twineDark), fibreMat, [0, y, .022]);
+  }
+  return bake(root);
 }
-function makeSpring(): Group {
-  const root = group('Iron spring');
-  buildSpring(root, metalMat, [0, 0, 0], [0, 0, 0], { length: .1, radius: .026, wire: .0045, turns: 7, perTurn: 11, radial: 5 });
+
+/** A bow limb's stave along Y (length .72), bent toward +Z at the middle; `simple` for the sentry's small copy. */
+function buildLimb(parent: Object3D, at: V3, rotation: V3, scale = 1, simple = false): void {
+  const holder = group('', at, rotation, scale);
+  const bend = (t: number) => .045 * (1 - (2 * t - 1) ** 2);
+  put(holder, sweep(pathOf(simple ? 8 : 16, (t) => [.0015 * Math.sin(t * 9), -.36 + .72 * t, bend(t)]), {
+    radius: (t) => { const r = .016 - .007 * Math.abs(2 * t - 1) ** 1.5; return [r, r * .88]; },
+    radial: simple ? 5 : 8, caps: true, capPaint: 0x9c7446, up: [0, 0, 1], tile: .3,
+    // Bark stripped to the pale sapwood; a few scraps of bark left at the knots.
+    paint: (t, a) => (Math.sin(t * 37 + a * 2) > .93 ? C.bark : mixHex(0xd8b684, 0xc29a64, .5 + .5 * Math.sin(t * 13 + a))),
+  }), woodMat);
+  // The grip: a cord whipping sealed with resin.
+  put(holder, tiled(cyl(.0172, .0176, .11, 10, C.twine, .05, 1, true), .11, .11, .03), fibreMat, [0, 0, bend(.5)]);
+  if (!simple) for (const y of [-.055, .055]) put(holder, cordRing(.018, .0028, C.twineDark, 10), fibreMat, [0, y, bend(.5 + y / .72)], [Math.PI / 2, 0, 0]);
+  // Nock bindings near both tips.
+  for (const t of [.035, .965]) put(holder, cordRing(.0098, .0026, C.twineDark, simple ? 6 : 10), fibreMat, [0, -.36 + .72 * t, bend(t)], [Math.PI / 2, 0, 0]);
+  if (!simple) for (const [y, a] of [[.03, .6], [-.02, 2.4]]) {
+    put(holder, ball(.0055, 8, 6, (_x, py) => mixHex(0xa7520f, 0xf0a13c, py / .01 + .5)), amberMat, [Math.cos(a) * .015, y, bend(.5) + Math.sin(a) * .017], [0, 0, 0], [.8, 1.5, .8]);
+  }
+  parent.add(holder);
+}
+
+/** Bow limb (stick, cord and resin at the bench): a bent, bark-stripped sapling stave, bound with cord. Lies on its side. */
+function makeLimb(): Group {
+  const root = group('Bow limb');
+  buildLimb(root, [0, 0, 0], [0, 0, 0]);
   return bake(root);
 }
 
@@ -1301,7 +1306,8 @@ function makeSentryKit(): Group {
     put(kit, tiled(cyl(.047, .047, .028, 12, C.leather, .05), .3, .03), leatherMat, [0, y, 0]);
     put(kit, box([.012, .03, .026], C.brass), metalMat, [0, y, .049]);
   }
-  buildSpring(kit, metalMat, [.066, .17, 0], [0, 0, Math.PI / 2], { length: .12, radius: .017, wire: .0035, turns: 5, perTurn: 7, radial: 4, hook: 6 });
+  // Its bow limb, lashed along the folded legs.
+  buildLimb(kit, [.052, .19, 0], [0, -Math.PI / 2, 0], .42, true);
   put(kit, tiled(cyl(.024, .024, .02, 8, C.leatherDark, .05, 1, true), .15, .02), leatherMat, [.066, .1, 0]);
   const folded = group('', [0, .392, .03], [0, 0, 0], .5);
   buildCrossbow(folded, { wood: woodMat, metal: metalMat, cord: leatherMat }, true);
@@ -1332,7 +1338,7 @@ function makeSentryKit(): Group {
   const bow = group('', [0, .075, .06]);
   buildCrossbow(bow, { wood: woodMat, metal: metalMat, cord: woodMat }, true);
   turret.add(bow);
-  // Gravity hopper of bolts over the nut, and the cocking spring along the butt.
+  // Gravity hopper of bolts over the nut, and the twisted cord skein that cocks it along the butt.
   put(turret, box([.05, .055, .12], C.woodMid, .05), woodMat, [0, .075 + .075, .06 - .07]);
   put(turret, box([.052, .006, .122], C.ironDark), metalMat, [0, .075 + .1, .06 - .07]);
   // The loaded bolts in the hopper: a named group so CombatSystem can hide it while the sentry is empty.
@@ -1342,7 +1348,7 @@ function makeSentryKit(): Group {
     put(hopper, box([.001, .012, .03], k === 0 ? 0x9a3b2c : 0xe4ddcf, .02), woodMat, [-.015 + k * .01, .075 + .1, .06 + .012]);
   }
   turret.add(hopper);
-  buildSpring(turret, metalMat, [.036, .075, .06 + .13], [0, Math.PI / 2, 0], { length: .15, radius: .013, wire: .003, turns: 7, perTurn: 6, radial: 3, hook: 5 });
+  put(turret, tiled(cyl(.011, .011, .15, 6, C.twine, .05), .07, .15, .03), fibreMat, [.036, .075, .06 + .13], [Math.PI / 2, 0, 0]);
   turret.add(group('muzzle', [0, .075 + .05, .06 - .42]));
   deployed.add(turret);
   root.add(deployed);
@@ -1350,40 +1356,43 @@ function makeSentryKit(): Group {
 }
 
 /**
- * Rolled backpack: a soft tan leather bedroll-style roll, oval in section, with rounded
- * closed ends (no end grain or spiral: it must never read as a log), two buckled straps
- * and a flat leather strap loop on top as the carry handle. Along X; bounds and handle
- * height match the old roll (BackpackSystem rests and hangs it by them).
+ * The backpack: a canvas rucksack with a leather base, a buckled top flap, a front pocket,
+ * two side bottles and a carry loop on top; shoulder straps on its -Z face (against the
+ * wearer's back). Origin 10.7 cm above its base (the catalog's 'pack' restY), so it stands
+ * upright when put down; BackpackSystem hangs it on the back by the same origin.
  */
 function makePackRoll(): Group {
-  const root = group('Rolled backpack');
-  const r = .1, oval = 1.22, length = .46;
-  const tan = 0x9a6a42, tanDark = 0x7e5334, strap = 0x5a3a24;
-  // Body: an oval leather roll with a soft overlapping flap seam along its side.
-  put(root, tiled(cyl(r, r, length, 18, (_x, y) => mixHex(tan, 0xa8784c, .5 + .5 * Math.sin(y * 21)), .05, 3), .7, length, .08),
-    leatherMat, [0, 0, 0], [0, 0, Math.PI / 2], [1, 1, oval]);
-  put(root, tiled(box([length - .01, .004, .05], tanDark, .04), length, .05, .08), leatherMat,
-    [0, Math.cos(1.05) * (r + .001), Math.sin(1.05) * (r + .001) * oval], [1.05, 0, 0]);
-  // Rounded, closed ends: squashed leather domes, a shade darker, with a stitched hem.
+  const root = group('Backpack');
+  const canvas = 0x8a7358, canvasDark = 0x6f5c45, strap = 0x5a3a24;
+  const W = .32, H = .36, D = .19, base = -.107;
+  const bodyY = base + .02 + H / 2;
+  // Body: canvas, softly bellied front and back (a squashed cylinder behind a box core).
+  put(root, tiled(box([W, H, D * .8], (_x, y) => mixHex(canvasDark, canvas, clamp01((y - base) / .3)), .05, [2, 3, 1]), W, H, .08), fibreMat,
+    [0, bodyY, 0]);
+  put(root, tiled(cyl(D / 2, D / 2, H, 12, canvas, .05), .6, H, .08), fibreMat, [0, bodyY, 0], [0, 0, 0], [W / D * .98, 1, 1]);
+  // Leather base.
+  put(root, tiled(box([W + .012, .04, D + .012], C.leatherDark, .03), W, D, .08), leatherMat, [0, base + .02, 0]);
+  // Top flap over the mouth, falling down the front, with two buckled straps.
+  put(root, tiled(box([W + .016, .025, D + .02], C.leather, .03), W, D, .08), leatherMat, [0, base + .02 + H + .005, 0]);
+  put(root, tiled(box([W * .92, .15, .014], C.leather, .03), W, .15, .08), leatherMat, [0, base + H - .06, D / 2 + .012], [-.08, 0, 0]);
+  for (const x of [-.09, .09]) {
+    put(root, box([.03, .2, .006], strap, .03), leatherMat, [x, base + H - .1, D / 2 + .022]);
+    put(root, box([.038, .03, .01], C.brass, .02), metalMat, [x, base + H - .19, D / 2 + .026]);
+  }
+  // Front pocket with its own little flap.
+  put(root, tiled(box([W * .66, .13, .055], canvasDark, .05), W, .13, .08), fibreMat, [0, base + .12, D / 2 + .02]);
+  put(root, box([W * .68, .03, .06], C.leather, .03), leatherMat, [0, base + .19, D / 2 + .022]);
+  // Side bottles in leather sleeves.
   for (const side of [-1, 1]) {
-    const x = side * length / 2;
-    put(root, tint(new SphereGeometry(r * .98, 14, 6, 0, TAU, 0, Math.PI / 2), tanDark, .05), leatherMat,
-      [x, 0, 0], [0, 0, -side * Math.PI / 2], [1, .28, oval]);
-    put(root, torus(r * .99, .005, 0xc9a86f, 18, 3), leatherMat, [x - side * .006, 0, 0], [0, Math.PI / 2, 0], [oval, 1, 1]);
+    put(root, tiled(cyl(.04, .042, .15, 10, C.leatherLight, .04), .26, .15, .08), leatherMat, [side * (W / 2 + .03), base + .1, 0]);
+    put(root, cyl(.018, .02, .03, 8, C.woodMid), woodMat, [side * (W / 2 + .03), base + .19, 0]);
   }
-  // Two buckled straps round the roll.
-  for (const x of [-.13, .13]) {
-    put(root, tiled(cyl(r + .006, r + .006, .045, 18, strap, .04), .66, .045, .08), leatherMat, [x, 0, 0], [0, 0, Math.PI / 2], [1, 1, oval]);
-    put(root, box([.05, .01, .05], C.brass), metalMat, [x, r + .01, 0]);
-    put(root, box([.036, .012, .036], 0x3b2a1c, 0), leatherMat, [x, r + .012, 0]);
-    put(root, tiled(box([.03, .016, .056], strap, .04), .03, .06, .08), leatherMat, [x + .03, r + .012, 0]);
-  }
-  // Carry strap: a flat leather loop standing over the roll between the straps.
-  put(root, tiled(torus(.085, .011, C.leatherLight, 14, 4, Math.PI), .27, .075, .08), leatherMat, [0, r - .004, 0], [0, 0, 0], [1, 1, 1.9]);
+  // Shoulder straps down the back face, and a carry loop on top.
   for (const x of [-.085, .085]) {
-    put(root, box([.03, .012, .04], strap, .03), leatherMat, [x, r + .002, 0]);
-    put(root, cyl(.006, .006, .044, 6, C.brass), metalMat, [x, r + .006, 0], [Math.PI / 2, 0, 0]);
+    put(root, tiled(box([.05, H * .9, .014], strap, .03), .05, H, .08), leatherMat, [x, bodyY, -D / 2 - .012], [.06, 0, 0]);
+    put(root, box([.04, .02, .02], C.brass, .02), metalMat, [x, base + .06, -D / 2 - .014]);
   }
+  put(root, tiled(torus(.045, .009, C.leatherLight, 12, 4, Math.PI), .15, .06, .08), leatherMat, [0, base + .02 + H + .016, 0]);
   return bake(root);
 }
 
@@ -1426,12 +1435,12 @@ export const itemAssets = {
   stick: makeStick(),
   log: makeLog(),
   plank: makePlank(),
-  cloth: makeCloth(),
   resin: makeResin(),
   flint: makeFlint(),
+  reeds: makeReeds(),
   cord: makeCord(),
   trigger: makeTrigger(),
-  spring: makeSpring(),
+  limb: makeLimb(),
   meat: makeMeat(),
   mushroom: makeMushroom(),
   berries: makeBerries(),

@@ -307,3 +307,25 @@ export function feintPhase(elapsed: number, inSeconds: number, snapSeconds: numb
   if (elapsed < inSeconds + snapSeconds) return 'snap';
   return 'out';
 }
+
+/**
+ * How far (m) the point (x, y, z), given in a carcass's own frame, lies outside a
+ * capsule along local Z from z0 to z1 at height y0 with radius `radius` (negative inside).
+ */
+export function capsuleGap(x: number, y: number, z: number, y0: number, z0: number, z1: number, radius: number): number {
+  const cz = Math.min(z1, Math.max(z0, z));
+  return Math.hypot(x, y - y0, z - cz) - radius;
+}
+
+export type BladeContact = 'blow' | 'rearm' | 'none';
+
+/**
+ * An axe blade against a target (gather-style arming): a brisk swing (`speed` over
+ * `minSpeed`) whose edge comes within `contact` of the surface lands a blow if the
+ * target is armed; pulling the blade back beyond `rearm` arms it again.
+ */
+export function bladeContact(gap: number, speed: number, armed: boolean, contact: number, rearm: number, minSpeed: number): BladeContact {
+  if (gap > rearm) return 'rearm';
+  if (gap < contact && speed > minSpeed && armed) return 'blow';
+  return 'none';
+}

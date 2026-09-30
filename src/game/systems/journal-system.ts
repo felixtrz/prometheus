@@ -1,10 +1,10 @@
 import { createSystem, Entity, UIKit, UIKitMLAsset, VisibilityState } from '@iwsdk/core';
 import { bus } from '../bus.js';
 import { GameState } from '../components.js';
-import { BENCH_RECIPES } from '../recipes.js';
+import { BENCH_RECIPES, knownRecipes, PRODUCT_COUNT } from '../recipes.js';
 import { DAY, DAY_LENGTH, nightness, phaseAt, Phase } from '../rules.js';
-import { onSettings, settings, updateSettings } from '../settings.js';
-import { currentObjective, ENDING, objectiveIndex, OBJECTIVES, PAGES } from '../story.js';
+import { type ComfortKey, cycleSetting, onSettings, settingLit, settingText } from '../settings.js';
+import { currentObjective, ENDING, objectiveIndex, objectiveRank, OBJECTIVES, PAGES } from '../story.js';
 import { DayNightSystem } from './daynight-system.js';
 import { StorySystem } from './story-system.js';
 
@@ -173,7 +173,7 @@ function styles(p: Palette) {
     /** After the ending New journey is the way on: the primary button. */
     newPrimary: { backgroundColor: p.btn, borderColor: p.btnLine, hover: { backgroundColor: p.btnHover } } as Style,
     newPrimaryLabel: { text: 'New journey', fontSize: 2.8, color: p.btnInk } as Style,
-    /** Comfort chip values: on (or the default speed) in gold, off in the quiet ink. */
+    /** Comfort chip values: lit (on, or any speed/turning) in gold, off in the quiet ink. */
     chipOn: { color: p.gold } as Style,
     chipOff: { color: p.quietInk } as Style,
     newArmedLabel: { text: 'Tap again to erase your journey', fontSize: 2.3, color: p.ink } as Style,
@@ -221,7 +221,7 @@ const OBJ_TICK = OBJECTIVES.map((_, i) => `jr-o${i}-tick`);
 const OBJ_TEXT = OBJECTIVES.map((_, i) => `jr-o${i}-text`);
 const OBJ_TITLE = OBJECTIVES.map((o) => plain(o.title));
 const OBJ_HINT = OBJECTIVES.map((o) => plain(o.hint));
-const OBJ_NUM = OBJECTIVES.map((_, i) => `${i + 1} OF ${OBJECTIVES.length}`);
+const OBJ_NUM = OBJECTIVES.map((_, i) => `${objectiveRank(i)} OF ${OBJECTIVES.length}`);
 const OBJ_COUNT = Array.from({ length: OBJECTIVES.length + 1 }, (_, i) => `${i} / ${OBJECTIVES.length}`);
 /** Secondary line while the sleep objective waits for the night. */
 export const TONIGHT_TEXT = `Tonight: ${OBJ_TITLE[SLEEP] ?? 'Survive the night, then sleep'}`;
@@ -229,11 +229,11 @@ export const TONIGHT_TEXT = `Tonight: ${OBJ_TITLE[SLEEP] ?? 'Survive the night, 
 const REC_NAME = BENCH_RECIPES.map((_, i) => `jr-r${i}-name`);
 const REC_INPUTS = BENCH_RECIPES.map((_, i) => `jr-r${i}-inputs`);
 const REC_LABEL = BENCH_RECIPES.map((r) => r.label);
-/** Journal notation: 'stick, cloth, resin'; duplicates fold into '2 sticks'. */
+/** Journal notation: 'stick, reeds, resin'; duplicates fold into '2 sticks' ('3 reeds' stays plural). */
 export function recipeInputs(inputs: readonly string[]): string {
   const counts = new Map<string, number>();
   for (const kind of inputs) counts.set(kind, (counts.get(kind) ?? 0) + 1);
-  return [...counts].map(([kind, n]) => (n > 1 ? `${n} ${kind}s` : kind)).join(', ');
+  return [...counts].map(([kind, n]) => (n > 1 ? `${n} ${kind.endsWith('s') ? kind : `${kind}s`}` : kind)).join(', ');
 }
 const REC_TEXT = BENCH_RECIPES.map((r) => recipeInputs(r.inputs));
 /** An unlearned recipe is a lead, not a dead end: the page that teaches it and where it lies. */
@@ -241,7 +241,8 @@ const REC_TEASER = BENCH_RECIPES.map((r) => {
   const page = PAGES.find((p) => p.teaches === r.product);
   return page ? plain(`Page ${page.index}, ${page.where}`) : 'not yet learned';
 });
-const REC_COUNT = Array.from({ length: BENCH_RECIPES.length + 1 }, (_, i) => `${i} / ${BENCH_RECIPES.length}`);
+/** The tally counts the page-taught products; the parts are known from the start. */
+const REC_COUNT = Array.from({ length: PRODUCT_COUNT + 1 }, (_, i) => `${i} / ${PRODUCT_COUNT}`);
 
 const PAGE_ID = PAGES.map((_, i) => `jr-p${i}`);
 const PAGE_FOUND = PAGES.map((p, i) => `${i + 1}.  ${plain(p.title)}`);
@@ -250,13 +251,14 @@ const PAGE_COUNT = Array.from({ length: PAGES.length + 1 }, (_, i) => `${i} / ${
 
 const SKY_IDS = SKY_ICON_SUFFIX.map((s) => `jr-ic-${s}`);
 
-/** Comfort chips (element id -> the setting it toggles). */
-const CHIPS = [
-  { id: 'jr-set-speed', value: 'jr-set-speed-val', name: 'Walking Speed Setting' },
-  { id: 'jr-set-tunnel', value: 'jr-set-tunnel-val', name: 'Comfort Tunnel Setting' },
-  { id: 'jr-set-flashes', value: 'jr-set-flashes-val', name: 'Reduce Flashes Setting' },
-  { id: 'jr-set-subs', value: 'jr-set-subs-val', name: 'Subtitles Setting' },
-] as const;
+/** Comfort chips (element id -> the setting it steps, via settings.ts cycleSetting). */
+const CHIPS: readonly { key: ComfortKey; id: string; value: string; name: string }[] = [
+  { key: 'speed', id: 'jr-set-speed', value: 'jr-set-speed-val', name: 'Walking Speed Setting' },
+  { key: 'turn', id: 'jr-set-turn', value: 'jr-set-turn-val', name: 'Turning Setting' },
+  { key: 'tunnel', id: 'jr-set-tunnel', value: 'jr-set-tunnel-val', name: 'Comfort Tunnel Setting' },
+  { key: 'flashes', id: 'jr-set-flashes', value: 'jr-set-flashes-val', name: 'Reduce Flashes Setting' },
+  { key: 'subs', id: 'jr-set-subs', value: 'jr-set-subs-val', name: 'Subtitles Setting' },
+];
 const STAT_IDS = ['jr-st-days', 'jr-st-falls', 'jr-st-pages', 'jr-st-recipes', 'jr-st-made', 'jr-st-slain'] as const;
 const popcount = (mask: number) => {
   let n = 0;
@@ -287,8 +289,8 @@ const ALL_DONE_HINT = plain(ENDING.rest);
  * - Colours dim with nightness in 8 steps (class-wide restyle only when the step changes).
  * - Tapping a found page title re-opens it on the board (ReaderSystem, 12 s).
  * - Unlearned recipes name the page that teaches them and where it lies.
- * - COMFORT chips toggle the player settings (settings.ts, saved per device): walking
- *   speed, comfort tunnel, reduce flashes, subtitles. Others read them live.
+ * - COMFORT chips step the player settings (settings.ts cycleSetting, saved per device):
+ *   walking speed, turning, comfort tunnel, reduce flashes, subtitles. Others read them live.
  * - After the ending the end card shows the journey (days, falls, pages, recipes, things
  *   made, Hollow slain: StorySystem.stats, saved with the journey; the 'epilogue' event's
  *   tally when it arrives) and New journey becomes the primary button.
@@ -388,12 +390,12 @@ export class JournalSystem extends createSystem({
       exit?.removeEventListener('click', this.onExit);
       fresh?.removeEventListener('click', this.onNew);
     });
-    // Comfort chips: each tap flips its setting (saved; locomotion, the vignette and the subtitles follow).
+    // Comfort chips: each tap steps its setting (saved; locomotion, the vignette and the subtitles follow).
     for (const chip of CHIPS) {
       const element = ui.get(chip.id);
       if (!element) continue;
       element.name = chip.name;
-      const onTap = () => this.toggleSetting(chip.id);
+      const onTap = () => cycleSetting(chip.key);
       element.addEventListener('click', onTap);
       this.unbind.push(() => element.removeEventListener('click', onTap));
     }
@@ -421,29 +423,14 @@ export class JournalSystem extends createSystem({
     if (this.game?.active) this.refresh(this.game);
   }
 
-  private toggleSetting(id: string): void {
-    switch (id) {
-      case 'jr-set-speed': updateSettings({ moveSpeed: settings.moveSpeed === 'slow' ? 'normal' : 'slow' }); break;
-      case 'jr-set-tunnel': updateSettings({ tunnel: !settings.tunnel }); break;
-      case 'jr-set-flashes': updateSettings({ reduceFlashes: !settings.reduceFlashes }); break;
-      case 'jr-set-subs': updateSettings({ subtitles: !settings.subtitles }); break;
-      default: break;
-    }
-  }
-
   /** Chip values from the live settings (and their colours for the night step). */
   private applySettings(): void {
     const ui = this.ui;
     if (!ui) return;
-    const s = this.s;
-    const put = (id: string, text: string, on: boolean) => {
-      ui.text(id, text);
-      ui.style(id, on ? s.chipOn : s.chipOff);
-    };
-    put('jr-set-speed-val', settings.moveSpeed === 'slow' ? 'Slow' : 'Normal', settings.moveSpeed !== 'slow');
-    put('jr-set-tunnel-val', settings.tunnel ? 'On' : 'Off', settings.tunnel);
-    put('jr-set-flashes-val', settings.reduceFlashes ? 'On' : 'Off', settings.reduceFlashes);
-    put('jr-set-subs-val', settings.subtitles ? 'On' : 'Off', settings.subtitles);
+    for (const chip of CHIPS) {
+      ui.text(chip.value, settingText(chip.key));
+      ui.style(chip.value, settingLit(chip.key) ? this.s.chipOn : this.s.chipOff);
+    }
   }
 
   private unbindPanel(): void {
@@ -539,7 +526,7 @@ export class JournalSystem extends createSystem({
     ui.text('jr-st-days', `${days}`);
     ui.text('jr-st-falls', `${deaths}`);
     ui.text('jr-st-pages', `${pages}/${PAGES.length}`);
-    ui.text('jr-st-recipes', `${recipes}/${BENCH_RECIPES.length}`);
+    ui.text('jr-st-recipes', `${recipes}/${PRODUCT_COUNT}`);
     ui.text('jr-st-made', `${made}`);
     ui.text('jr-st-slain', `${slain}`);
   }
@@ -600,9 +587,10 @@ export class JournalSystem extends createSystem({
     if (recipes !== this.snapRecipes) {
       this.snapRecipes = recipes;
       let known = 0;
+      const all = knownRecipes(recipes);
       for (let i = 0; i < BENCH_RECIPES.length; i++) {
-        const state = recipes & (1 << i) ? 1 : 0;
-        known += state;
+        const state = all & (1 << i) ? 1 : 0;
+        if (!BENCH_RECIPES[i].part) known += state;
         if (this.recipeRows[i] === state) continue;
         this.recipeRows[i] = state;
         ui.text(REC_NAME[i], REC_LABEL[i]);

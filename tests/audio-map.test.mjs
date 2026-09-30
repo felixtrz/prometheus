@@ -17,7 +17,7 @@ const mapCode = transpile('../src/game/audio-map.ts')
   .replace(/(["'])\.\/terrain\.js\1/g, `'${terrainUrl}'`);
 assert.doesNotMatch(mapCode, /from\s+["']\.\//, 'audio-map.ts gained an unstubbed runtime import');
 const {
-  CLIP_DEFS, DUCK, HEARTBEAT, STEP, strideFor, beaconBuildVolume, createCue, dayBedGain, fireLoopVolume, heartbeatVolume, mapEvent,
+  CLIP_DEFS, DUCK, HEARTBEAT, REVERB, STARVE, STEP, reverbWet, starveScale, strideFor, beaconBuildVolume, createCue, dayBedGain, fireLoopVolume, heartbeatVolume, mapEvent,
   nearestOnPolyline, nightBedGain, stepCue, stepSurface, variantId,
 } = await import(dataUrl(mapCode));
 const { CAMP, DANGER } = await import(rulesUrl);
@@ -48,7 +48,7 @@ const SAMPLES = {
   eat: { kind: 'berries', hunger: 60 },
   strike: { count: 1, valid: true, ...P },
   crafted: { product: 'torch', learned: false, ...P },
-  chop: { node: 'deadwood', remaining: 2, ...P },
+  chop: { node: 'tree', remaining: 2, ...P },
   harvest: { kind: 'berries', ...P },
   'torch-lit': { ...P },
   pack: { state: 'unrolled', ...P },
@@ -83,6 +83,7 @@ const SAMPLES = {
   guide: { id: 'intro', text: 'Hello', seconds: 2 },
   'guide-end': { id: 'intro', cut: false },
   'journey-begin': { resumed: false },
+  journey: { step: 'open' },
   'spawn-item': { kind: 'stick', ...P },
   'finale-hold': { active: true },
   'finale-wave': { wave: 1, count: 2 },
@@ -91,7 +92,7 @@ const SAMPLES = {
   epilogue: { days: 4, deaths: 1, crafted: 6, slain: 5 },
 };
 // Silent by design: toasts, requests, and 'ending' (the theme starts on ending-step 'theme').
-const SILENT = new Set(['toast', 'new-game', 'spawn-item', 'ending', 'guide', 'guide-end', 'journey-begin', 'finale-wave', 'well-fed', 'epilogue']);
+const SILENT = new Set(['toast', 'new-game', 'spawn-item', 'ending', 'guide', 'guide-end', 'journey-begin', 'journey', 'finale-wave', 'well-fed', 'epilogue']);
 const ev = (type, extra = {}) => ({ type, ...SAMPLES[type], ...extra });
 
 test('every bus event type is covered: sounding ones map to a registered clip', () => {
@@ -195,6 +196,13 @@ test('event details pick the right variant', () => {
   assert.equal(mapEvent(ev('thud', { kind: 'spear' })).clip, 'bolt-thunk');
   assert.equal(mapEvent(ev('thud', { kind: 'hammer' })).clip, 'knock');
   assert.equal(mapEvent(ev('thud', { kind: 'axe' })).clip, 'knock');
+  // The wreck's jammed door rings like metal under the axe, and its torn panel lands heavily.
+  assert.equal(mapEvent(ev('thud', { kind: 'wreck-door' })).clip, 'hammer-clank');
+  assert.equal(mapEvent(ev('drop', { kind: 'wreck-door', hard: true })).clip, 'drop');
+  // A felled tree crashes down: the heavy drop, loud and far-reaching.
+  const fall = mapEvent(ev('thud', { kind: 'tree-fall' }));
+  assert.equal(fall.clip, 'drop');
+  assert.ok(fall.refDistance >= 8 && fall.volume >= mapEvent(ev('thud', { kind: 'axe' })).volume);
   assert.equal(mapEvent(ev('bench-set', { valid: false, product: '', known: false })).clip, 'invalid-clunk');
   assert.equal(mapEvent(ev('lighter', { lit: false })).clip, 'lid-clink');
   assert.equal(mapEvent(ev('crossbow-empty')).clip, 'dry-click');
@@ -203,6 +211,16 @@ test('event details pick the right variant', () => {
   assert.equal(mapEvent(ev('pack', { state: 'worn' })).clip, 'snap');
   assert.equal(mapEvent(ev('harvest', { kind: 'plank' })), null, 'the stump split already sounds');
   assert.equal(mapEvent(ev('harvest', { kind: 'flint' })).clip, 'drop-light');
+  assert.equal(mapEvent(ev('harvest', { kind: 'reeds' })).clip, 'rustle', 'reeds rustle as they are pulled');
+  // Crafted parts land like the wood or fibre they are made of.
+  assert.equal(mapEvent(ev('drop', { kind: 'limb', hard: true })).clip, 'drop');
+  assert.equal(mapEvent(ev('drop', { kind: 'reeds' })).clip, 'drop-light');
+  assert.equal(mapEvent(ev('drop', { kind: 'cord' })).clip, 'drop-light');
+  assert.equal(mapEvent(ev('drop', { kind: 'trigger' })).clip, 'drop-light');
+  // Butchering: the axe in a carcass hits meat, not wood; its meat drops with a thud.
+  assert.equal(mapEvent(ev('chop', { node: 'carcass', remaining: 0 })).clip, 'hit');
+  assert.equal(mapEvent(ev('chop', { node: 'carcass', remaining: 2 })).clip, 'hit');
+  assert.equal(mapEvent(ev('harvest', { kind: 'meat' })).clip, 'drop');
   assert.equal(mapEvent(ev('crafted', { learned: true })), null, 'recipe-learned plays alone');
   assert.equal(mapEvent(ev('hit', { kind: 'torch' })).clip, 'ignite');
   assert.equal(mapEvent(ev('throw', { speed: 1 })), null, 'gentle tosses are silent');
@@ -255,6 +273,32 @@ test('sentry dry click is placed at the sentry; a hurt with an attacker lands on
   assert.ok(CLIP_DEFS['player-struck'].near > 0 && CLIP_DEFS['player-struck'].near < 1, 'placed just off the head');
   assert.equal(struck.volume, mapEvent(ev('hurt', { amount: 20 })).volume, 'same level as the head-locked hurt');
   assert.equal(mapEvent(ev('hurt', { amount: 1.5, cause: 'starving' })).clip, 'player-hurt');
+});
+
+test('starving is a soft breath, with a grunt only every third tick', () => {
+  const soft = mapEvent(ev('hurt', { amount: 1.5, cause: 'starving' }));
+  assert.equal(soft.positional, false);
+  assert.ok(Math.abs(soft.volume - CLIP_DEFS['player-hurt'].volume * STARVE.soft) < 1e-9, 'soft by default');
+  assert.ok(soft.volume < mapEvent(ev('hurt', { amount: 1.5, cause: 'bite' })).volume / 2);
+  assert.equal(STARVE.every, 3);
+  const levels = Array.from({ length: 9 }, (_, k) => starveScale(k, 1.5));
+  const grunts = levels.map((v, k) => (v > STARVE.soft ? k : -1)).filter((k) => k >= 0);
+  assert.deepEqual(grunts, [0, 3, 6], 'first tick and every third after');
+  assert.ok(Math.abs(levels[0] - 0.58) < 1e-9, 'the grunt keeps the hurt level for the damage');
+});
+
+test('page sounds are hand sounds; the room send grows with distance', () => {
+  assert.equal(CLIP_DEFS['sfx-page'].positional, true, 'sfx-page plays at the hand, not in the head');
+  const grab = mapEvent(ev('grab', { kind: 'page', x: 1, y: 1.2, z: -3 }));
+  assert.deepEqual([grab.clip, grab.positional, grab.x, grab.y, grab.z], ['sfx-page', true, 1, 1.2, -3]);
+  const page = mapEvent(ev('page', { first: true }));
+  assert.deepEqual([page.clip, page.positional], ['sfx-page', true]);
+  assert.ok(page.volume > mapEvent(ev('page', { first: false })).volume, 'a new page is louder');
+  assert.equal(reverbWet(0), 0);
+  assert.equal(reverbWet(REVERB.start), 0, 'dry up close');
+  assert.ok(Math.abs(reverbWet(14) - 0.25) < 1e-9, '(14 − 4) / 40');
+  assert.equal(reverbWet(200), REVERB.max);
+  assert.equal(REVERB.max, 0.3);
 });
 
 test('heartbeat rhythm shared with the vignette', () => {

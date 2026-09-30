@@ -14,22 +14,26 @@ import { campCapturePlugin } from './tests/capture-plugin.mjs';
 const CDP_PATCHED = Symbol.for('prometheus.managedCdp');
 
 /**
- * Give the IWSDK managed browser a Chrome DevTools port (PROMETHEUS_CDP_PORT,
- * default 9333) so vitexec checks can drive the managed runtime
- * (tests/vitexec-managed.mjs). The plugin launches Chromium through Playwright in
- * this process; its launch options gain one flag. Skipped for vitexec's own
- * isolated servers (tests/vitexec.config.ts sets IWSDK_DEV_OPEN=false).
+ * Opt-in (PROMETHEUS_CDP_PORT=<port>, e.g. 9333): give the IWSDK managed browser a
+ * Chrome DevTools port so vitexec checks can drive the managed runtime
+ * (tests/vitexec-run.mjs, `npm run check`). Unset, the managed browser
+ * gets no debugging port. The plugin launches Chromium through Playwright in this
+ * process; its launch options gain one flag.
+ *
+ * `npm run dev:runtime` — the script every `iwsdk dev up|restart` launches — sets
+ * it to 9333 unless the variable is already set; set it empty to turn it off.
  */
 function managedBrowserDebugPort(): Plugin {
   return {
     name: 'prometheus:managed-cdp',
     apply: 'serve',
     config() {
-      if (process.env.IWSDK_DEV_OPEN === 'false' || process.env.PROMETHEUS_CDP_PORT === 'off') return;
+      const port = process.env.PROMETHEUS_CDP_PORT;
+      if (!port || !/^\d+$/.test(port)) return;
       const target = chromium as typeof chromium & { [CDP_PATCHED]?: boolean };
       if (target[CDP_PATCHED]) return;
       target[CDP_PATCHED] = true;
-      const flag = `--remote-debugging-port=${process.env.PROMETHEUS_CDP_PORT ?? '9333'}`;
+      const flag = `--remote-debugging-port=${port}`;
       const launch = chromium.launch.bind(chromium);
       const launchPersistentContext = chromium.launchPersistentContext.bind(chromium);
       chromium.launch = (options = {}) => launch({ ...options, args: [...(options.args ?? []), flag] });

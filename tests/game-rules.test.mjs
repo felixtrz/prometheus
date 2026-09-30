@@ -8,11 +8,42 @@ const rules = await loadTs('src/game/rules.ts');
 const catalog = await loadTs('src/game/catalog.ts');
 
 test('bench recipes match in any bay order and reject near misses', () => {
-  assert.equal(recipes.BENCH_RECIPES[recipes.matchBench(['resin', 'stick', 'cloth'])].product, 'torch');
+  assert.equal(recipes.BENCH_RECIPES[recipes.matchBench(['resin', 'stick', 'reeds'])].product, 'torch');
   assert.equal(recipes.BENCH_RECIPES[recipes.matchBench(['flint', 'stick', 'stick'])].product, 'bolts');
   assert.equal(recipes.matchBench(['stick', 'stick', 'stick']), -1);
-  assert.equal(recipes.matchBench(['stick', 'cloth']), -1);
-  assert.equal(recipes.matchBench(['stick', 'cloth', '']), -1);
+  assert.equal(recipes.matchBench(['stick', 'reeds']), -1);
+  assert.equal(recipes.matchBench(['stick', 'reeds', '']), -1);
+});
+
+test('the recipe tree: gathered materials make parts, parts make tools', () => {
+  const make = (...kinds) => recipes.BENCH_RECIPES[recipes.matchBench(kinds)]?.product;
+  assert.equal(make('reeds', 'reeds', 'reeds'), 'cord');
+  assert.equal(make('stick', 'resin', 'stick'), 'plank');
+  assert.equal(make('flint', 'plank', 'stick'), 'trigger');
+  assert.equal(make('resin', 'cord', 'stick'), 'limb');
+  assert.equal(make('cord', 'flint', 'stick'), 'spear');
+  assert.equal(make('trigger', 'limb', 'plank'), 'crossbow');
+  assert.equal(make('limb', 'trigger', 'log'), 'sentry-kit');
+  // Every set is distinct, and the bench's three bays take exactly three parts.
+  const keys = recipes.BENCH_RECIPES.map((r) => [...r.inputs].sort().join('+'));
+  assert.equal(new Set(keys).size, keys.length);
+  for (const r of recipes.BENCH_RECIPES) assert.equal(r.inputs.length, 3, r.product);
+  // Only gathered materials are placed in the world; everything else is made.
+  const gathered = new Set(['stick', 'log', 'resin', 'flint', 'reeds', 'meat', 'mushroom', 'berries', 'herb']);
+  const made = new Set(recipes.BENCH_RECIPES.map((r) => r.product));
+  for (const r of recipes.BENCH_RECIPES) for (const input of r.inputs) assert.ok(gathered.has(input) || made.has(input), `${r.product} needs ${input}`);
+  assert.ok(!catalog.isItemKind('cloth') && !catalog.isItemKind('spring'), 'cloth and the iron spring are gone');
+});
+
+test('save bits: the five page-taught products keep their bits; the parts are known from the start', () => {
+  assert.deepEqual(recipes.BENCH_RECIPES.slice(0, 5).map((r) => r.product), ['torch', 'spear', 'bolts', 'crossbow', 'sentry-kit']);
+  assert.ok(recipes.BENCH_RECIPES.slice(0, 5).every((r) => !r.part));
+  const parts = recipes.BENCH_RECIPES.filter((r) => r.part).map((r) => r.product);
+  assert.deepEqual(parts.sort(), ['cord', 'limb', 'plank', 'trigger']);
+  const known = recipes.knownRecipes(0);
+  recipes.BENCH_RECIPES.forEach((r, i) => assert.equal((known & recipes.recipeBit(i)) !== 0, r.part, r.product));
+  assert.equal(recipes.knownRecipes(1) & 1, 1, 'learned products stay known');
+  for (const page of story.PAGES) if (page.teaches) assert.ok(!recipes.BENCH_RECIPES[recipes.benchRecipeIndex(page.teaches)].part, `page ${page.index} teaches a product`);
 });
 
 test('every recipe input and product is a catalog item', () => {
@@ -32,8 +63,10 @@ test('stews need two ingredients and pay 1.5x', () => {
 test('pages teach known recipes and every objective is reachable in order', () => {
   for (const page of story.PAGES) if (page.teaches) assert.ok(recipes.benchRecipeIndex(page.teaches) >= 0, page.teaches);
   assert.equal(story.PAGES.length, 7);
-  assert.equal(story.currentObjective(0), 0);
-  assert.equal(story.currentObjective(0b111), 3);
+  // The journey's three (appended bits 10-12) come first, then the camp's in bit order.
+  assert.equal(story.currentObjective(0), story.objectiveIndex('escape'));
+  assert.equal(story.currentObjective(story.JOURNEY_MASK), 0);
+  assert.equal(story.currentObjective(story.JOURNEY_MASK | 0b111), 3);
   assert.equal(story.currentObjective((1 << story.OBJECTIVES.length) - 1), -1);
 });
 

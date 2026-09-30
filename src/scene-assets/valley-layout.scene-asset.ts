@@ -5,6 +5,7 @@
  * design/concept/layout.svg. Deterministic: evaluated by the runtime and the editor.
  */
 import { brookHit, brookNearest, LANDMARKS, terrainHeight, WORLD_BOUNDS } from '../game/terrain.js';
+import { FOREST_MUSHROOMS, JOURNEY_TRAIL, journeyBlocksTree } from '../game/journey.js';
 
 export type XZ = { x: number; z: number };
 type Pine = XZ & { asset: 'pine-1' | 'pine-2'; scale: number; yawDeg: number; id: string };
@@ -44,8 +45,10 @@ export const TRAIL_CONTROL = {
   grove: [{ x: .8, z: -8 }, { x: -3.5, z: -9.4 }, { x: -8.5, z: -10.2 }, { x: -13.2, z: -10.6 }, { x: -15.2, z: -11 }],
   meadow: [{ x: 1.5, z: -12.5 }, { x: 5.5, z: -12.9 }, { x: 9.5, z: -14 }, { x: 13.4, z: -15 }, { x: 16.9, z: -12.6 }, { x: 18.7, z: -11.4 }],
   east: [{ x: 23.3, z: -11.2 }, { x: 25.6, z: -10.4 }, { x: 27.4, z: -9 }],
+  /** The opening journey: wreck door → waystation → the grove trail (src/game/journey.ts). */
+  journey: [...JOURNEY_TRAIL],
 } satisfies Record<string, XZ[]>;
-export const TRAIL_HALF_WIDTH = { main: 1.05, grove: .72, meadow: .72, east: .6 } as const;
+export const TRAIL_HALF_WIDTH = { main: 1.05, grove: .72, meadow: .72, east: .6, journey: .72 } as const;
 export const TRAILS = Object.fromEntries(Object.entries(TRAIL_CONTROL).map(([k, v]) => [k, catmull(v, .45)])) as Record<keyof typeof TRAIL_CONTROL, XZ[]>;
 
 const trailSegments: { ax: number; az: number; dx: number; dz: number; len2: number; half: number; key: string; s0: number; len: number }[] = [];
@@ -61,9 +64,10 @@ for (const key of Object.keys(TRAILS) as (keyof typeof TRAILS)[]) {
 }
 /** Result of the last `trailNearest` call. `edge` = distance / half-width (1 = dirt edge). */
 export const trailHit = { distance: 99, edge: 99, key: '', along: 0 };
-export function trailNearest(x: number, z: number): number {
+export function trailNearest(x: number, z: number, skip?: keyof typeof TRAIL_CONTROL): number {
   let best = 1e9, bestEdge = 1e9, key = '', along = 0;
   for (const seg of trailSegments) {
+    if (seg.key === skip) continue;
     // Cheap reject: segments are ≤ 0.5 m long, so a far start point can't beat the current best.
     const ex = x - seg.ax, ez = z - seg.az;
     if (Math.max(Math.abs(ex), Math.abs(ez)) - .6 > bestEdge * seg.half) continue;
@@ -76,12 +80,24 @@ export function trailNearest(x: number, z: number): number {
   return best;
 }
 
+/** Distance from (x, z) to one trail's centreline (m). */
+export function trailDistance(x: number, z: number, key: keyof typeof TRAIL_CONTROL): number {
+  let best = 1e9;
+  for (const seg of trailSegments) {
+    if (seg.key !== key) continue;
+    const t = Math.min(1, Math.max(0, ((x - seg.ax) * seg.dx + (z - seg.az) * seg.dz) / seg.len2));
+    best = Math.min(best, Math.hypot(seg.ax + seg.dx * t - x, seg.az + seg.dz * t - z));
+  }
+  return best;
+}
+
 // ------------------------------------------------------------------------ key places
 export const GROVE = {
   centre: LANDMARKS.grove,
   /** Resin pines: trunk centres. The 'resin-scar' faces the clearing at 1.2 m. */
   resinPines: [{ x: -20.6, z: -13.6 }, { x: -14.6, z: -14.4 }, { x: -19.8, z: -7.4 }],
-  deadwood: [{ x: -17.4, z: -6, yawDeg: 18 }, { x: -22.6, z: -10.4, yawDeg: -62 }, { x: -12, z: -13, yawDeg: 40 }],
+  /** Open glades kept clear of trees (where fallen trunks once lay; the tree scatter keeps them). */
+  glades: [{ x: -17.4, z: -6 }, { x: -22.6, z: -10.4 }, { x: -12, z: -13 }],
   mushrooms: [{ x: -16, z: -12.9 }, { x: -19, z: -10.2 }, { x: -21.4, z: -15.8 }],
   /** Page 3 lies on this stump (scene node 'grove-stump', ItemSurface). */
   stump: { x: -16.6, z: -10, top: .46, radius: .3 },
@@ -167,8 +183,9 @@ export const CRATE_STRAW_TOP = .4;
 
 // ----------------------------------------------------------------------------- trees
 /**
- * Broadleaf trees baked into the static batches (`region` says which): the woodland
- * ring round camp and the meadow edge. GatherSystem reads this list to chop them.
+ * Broadleaf trees (`region` says which batch keeps their shadow and collider): the
+ * woodland ring round camp and the meadow edge. ForestSystem draws and fells them from
+ * this list; the editor sees them as the 'valley-broadleaves' scene asset.
  * `h` is the tree height; the trunk is h·0.5 tall, radius h·0.066 → h·0.04.
  */
 export const BROADLEAVES: { x: number; z: number; h: number; yaw: number; variant: number; region: 'camp' | 'meadow' }[] = [
@@ -183,8 +200,21 @@ export const BROADLEAVES: { x: number; z: number; h: number; yaw: number; varian
   { x: 25.8, z: -6.4, h: 3.8, yaw: 1.2, variant: 2, region: 'meadow' },
 ];
 
-/** Near "identity" GLB pines in the valley (the camp keeps woodland-pine-1..6). */
-export const GLB_PINES: Pine[] = [
+/**
+ * The opening journey's clearances, applied after the scatter: the wreck clearing, the
+ * wolves' sightlines and the waystation stay open (journeyBlocksTree); the journey trail
+ * keeps its dirt clear but trees may stand within a couple of metres of it (the "fell a
+ * tree" beat); its new mushroom patches keep a little room.
+ */
+export const JOURNEY_TREE_CLEARANCE = { trail: 1.7, mushroom: 1.6 } as const;
+export function journeyKeepsTree(x: number, z: number): boolean {
+  if (journeyBlocksTree(x, z)) return false;
+  if (trailDistance(x, z, 'journey') < JOURNEY_TREE_CLEARANCE.trail) return false;
+  return FOREST_MUSHROOMS.every((m) => Math.hypot(x - m.x, z - m.z) >= JOURNEY_TREE_CLEARANCE.mushroom);
+}
+
+/** The valley GLB pines as first placed (the scatter keeps clear of these; see GLB_PINES). */
+const SCATTER_GLB_PINES: Pine[] = [
   { id: 'grove-pine-resin-1', asset: 'pine-1', scale: .9, ...GROVE.resinPines[0], yawDeg: 0 },
   { id: 'grove-pine-resin-2', asset: 'pine-1', scale: .86, ...GROVE.resinPines[1], yawDeg: 0 },
   { id: 'grove-pine-resin-3', asset: 'pine-1', scale: .94, ...GROVE.resinPines[2], yawDeg: 0 },
@@ -196,9 +226,32 @@ export const GLB_PINES: Pine[] = [
 ];
 // Resin pines turn their branch-free side (local +Z) toward the clearing.
 for (let i = 0; i < 3; i++) {
-  const p = GLB_PINES[i], dx = GROVE.centre.x - p.x, dz = GROVE.centre.z - p.z;
+  const p = SCATTER_GLB_PINES[i], dx = GROVE.centre.x - p.x, dz = GROVE.centre.z - p.z;
   p.yawDeg = Math.atan2(dx, dz) * 180 / Math.PI;
 }
+/**
+ * Near "identity" GLB pines in the valley (scene nodes of the same ids; the camp keeps
+ * woodland-pine-1..6): the first placement minus those in the journey's clearings.
+ * 'grove-pine-4' stands 2.2 m off the journey trail: the first tree its "fell a tree"
+ * beat meets (ForestSystem.nearestChoppable finds it).
+ */
+/**
+ * The forest leg of the opening journey (waystation → grove → camp): choppable pines 2–3 m
+ * beside the trail, so the "fell a tree for firewood" beat meets one every few steps. Added
+ * after the scatter (it never moves another tree); scene nodes of the same ids
+ * (ForestSystem indexes them like every GLB pine, and the colliders include them).
+ */
+export const JOURNEY_PINES: Pine[] = [
+  { id: 'journey-pine-1', asset: 'pine-1', scale: 0.82, x: -23.39, z: -13.31, yawDeg: 0 },
+  { id: 'journey-pine-2', asset: 'pine-2', scale: 0.86, x: -18.4, z: -13, yawDeg: 83 },
+  { id: 'journey-pine-3', asset: 'pine-1', scale: 0.9, x: -16.24, z: -7.97, yawDeg: 166 },
+  { id: 'journey-pine-4', asset: 'pine-1', scale: 0.94, x: -14.76, z: -8.77, yawDeg: 249 },
+  { id: 'journey-pine-5', asset: 'pine-2', scale: 0.84, x: -12.55, z: -8.44, yawDeg: 332 },
+  { id: 'journey-pine-6', asset: 'pine-1', scale: 0.88, x: -10.21, z: -12.45, yawDeg: 55 },
+  { id: 'journey-pine-7', asset: 'pine-1', scale: 0.92, x: -8.74, z: -8.11, yawDeg: 138 },
+  { id: 'journey-pine-8', asset: 'pine-2', scale: 0.82, x: -6.07, z: -11.92, yawDeg: 221 },
+];
+export const GLB_PINES: Pine[] = [...SCATTER_GLB_PINES.filter((p) => journeyKeepsTree(p.x, p.z)), ...JOURNEY_PINES];
 /** GLB pine source bounds (pine-1/pine-2 share the trunk base). */
 export const PINE_MIN_Y = -.235;
 export const RESIN_SCAR_HEIGHT = 1.2;
@@ -208,16 +261,21 @@ export const PINE_TRUNK_RADIUS = .165;
 /** Anything a tree must keep clear of (points with radii). */
 const keepClear: [number, number, number][] = [
   ...GROVE.resinPines.map((p): [number, number, number] => [p.x, p.z, 2.6]),
-  ...GROVE.deadwood.map((p): [number, number, number] => [p.x, p.z, 2.2]),
+  ...GROVE.glades.map((p): [number, number, number] => [p.x, p.z, 2.2]),
   ...GROVE.mushrooms.map((p): [number, number, number] => [p.x, p.z, 1.8]),
   [GROVE.stump.x, GROVE.stump.z, 2.4], [GROVE.brazier.x, GROVE.brazier.z, 2.6],
   ...MEADOW.berries.map((p): [number, number, number] => [p.x, p.z, 2.5]),
   ...MEADOW.herbs.map((p): [number, number, number] => [p.x, p.z, 2]),
-  ...GLB_PINES.map((p): [number, number, number] => [p.x, p.z, 3.4]),
+  ...SCATTER_GLB_PINES.map((p): [number, number, number] => [p.x, p.z, 3.4]),
   [BROOK.pageRock.x, BROOK.pageRock.z, 2.5],
 ];
+/**
+ * Where the original scatter may not put a tree. The journey trail is left out here on
+ * purpose: its clearances are a later filter (`journeyKeepsTree`), so adding the journey
+ * only removed trees and moved none (the scene's pattern transforms were baked from this).
+ */
 function blockedForTrees(x: number, z: number, margin = 0): boolean {
-  if (trailNearest(x, z) < 2.9 + margin) return true;
+  if (trailNearest(x, z, 'journey') < 2.9 + margin) return true;
   if (Math.abs(x - 21) < 8 && brookNearest(x, z) < 3.4 + margin) return true;
   if (Math.hypot(x - .3, z + 1.6) < 11 + margin) return true;
   if (Math.hypot(x - OUTPOST.centre.x, z - OUTPOST.centre.z) < 8.6 + margin) return true;
@@ -280,7 +338,7 @@ export const VALLEY_PINES: Record<string, TreeInstance[]> = {};
   all.push(...valley);
   // Three sectors × two silhouettes ('valley-pine', 'valley-pine-tall'); each list lowers to one InstancedMesh.
   const sector = (t: TreeInstance) => (t.z > -9 ? 'south' : t.x < 2 ? 'west' : 'east') + (t.variant ? '-tall' : '');
-  for (const t of all) (VALLEY_PINES[sector(t)] ??= []).push(t);
+  for (const t of all) if (journeyKeepsTree(t.x, t.z)) (VALLEY_PINES[sector(t)] ??= []).push(t);
 }
 
 /** Low-poly 'far-pine' belts on the ridges outside the walls, split by sector. */
@@ -297,6 +355,7 @@ export const FAR_PINES: Record<string, TreeInstance[]> = {};
     return r() < keep ? { x, z } : null;
   }, [.85, 1.35]);
   for (const t of all) {
+    if (journeyBlocksTree(t.x, t.z)) continue;
     const key = t.z > WORLD_BOUNDS.maxZ ? 'south'
       : t.z < WORLD_BOUNDS.minZ ? 'north'
       : `${t.x < 0 ? 'west' : 'east'}-${t.z < -34 ? 'north' : t.z < -8 ? 'mid' : 'south'}`;

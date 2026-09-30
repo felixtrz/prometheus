@@ -32,8 +32,9 @@
  * (inside a headset's view: the edge of view, or 3.4–3.8 m, only when the crowded camp
  * leaves nothing nearer), floating just above the ground, on a spot clear of the camp
  * props, the player's path and the sightlines to the journal board, the fire, the current
- * objective and the held item (an urgent line, priority >= 7, may stand across the board's
- * sightline rather than at the edge of view; calm lore, priority <= 5, stands 40-50°).
+ * objective and the held item (an urgent line, priority >= 7, first tries 35-45° off the view,
+ * standing across the board's sightline rather than at the edge of view; calm lore, priority <= 5,
+ * stands 40-50°).
  * It faces the player, sways, raises the ember in its right hand and flares while
  * talking, then lingers and fades out. It never follows the gaze and its voice never
  * jumps mid-line: while it speaks it only glides (at most GLIDE_MAX m/s) back if the
@@ -76,6 +77,9 @@ import {
 import { VOICE_HASHES } from '../voice-urls.js';
 import { SHADE } from '../../scene-assets/ghost.scene-asset.js';
 import { DayNightSystem } from './daynight-system.js';
+import { BackpackSystem } from './backpack-system.js';
+import { JourneySystem } from './journey-system.js';
+import { insideCabin, JOURNEY_STEPS, shadeMark, WRECK, type JourneyStep, type XZ } from '../journey.js';
 
 type Phase = 'idle' | 'arriving' | 'speaking' | 'lingering' | 'leaving' | 'departing';
 type Pending = { line: GuideLine; at: number };
@@ -113,6 +117,14 @@ const TOAST_WAIT = 4;
 const SPOT_ANGLES: readonly number[] = [42, 38, 46, 50, 35, 55, 58, 64, 70];
 /** Calm lore (priority CALM_PRIORITY or lower) stands a little wider, still inside the view. */
 const SPOT_ANGLES_CALM: readonly number[] = [48, 44, 50, 40, 36, 55, 58, 64, 70];
+/**
+ * An urgent line (URGENT_PRIORITY or more) first tries URGENT_ANGLES within the band, well
+ * inside a Quest 3's view (about ±55°), accepting a spot whose only conflict is the journal
+ * board's sightline; only when none is clear does it fall back to the full search. Between
+ * lines, a shade standing wider than URGENT_KEEP re-forms before an urgent line.
+ */
+const URGENT_ANGLES: readonly number[] = [40, 38, 42, 36, 44, 35, 45];
+const URGENT_KEEP = 48;
 const CALM_PRIORITY = 5;
 const URGENT_PRIORITY = 7;
 const SPOT_DISTANCES: readonly number[] = [2.6, 2.4, 2.8, 3.0, 3.4, 3.8];
@@ -265,6 +277,9 @@ export class GuideSystem extends createSystem({
   private followTimer = 0;
   private handNearDone = false;
   private grabbedAny = false;
+  /** Where the journey pins the shade (the wreck's aisle, outside its door), when it does. */
+  private journey?: JourneySystem;
+  private readonly mark: XZ = { x: 0, z: 0 };
   private stateEntity: Entity | undefined;
   private fireEntity: Entity | undefined;
   private benchEntity: Entity | undefined;
@@ -704,6 +719,16 @@ export class GuideSystem extends createSystem({
       case 'bench-wrong': return this.benchEntity?.getValue(CraftBench, 'match') === '!';
       case 'torch-lit': return (objectives & TORCH_DONE) !== 0;
       case 'sentry-built': return (objectives & SENTRY_DONE) !== 0;
+      case 'in-wreck': return insideCabin(this.eye.x, this.eye.z);
+      case 'near-door': return this.journeyAtLeast('door');
+      case 'door-open': return this.journeyAtLeast('open');
+      case 'axe-holstered': {
+        for (const item of this.queries.items.entities) {
+          if (item.getValue(Item, 'kind') === 'axe' && (item.getValue(Item, 'slot') ?? '').startsWith('hip-')) return true;
+        }
+        return false;
+      }
+      case 'pack-owned': return this.world.getSystem(BackpackSystem)?.owned === true;
       case 'sentry-dry': {
         for (const sentry of this.queries.sentries.entities) if ((sentry.getValue(Sentry, 'bolts') ?? 0) <= 0) return true;
         return false;
@@ -1113,6 +1138,14 @@ export class GuideSystem extends createSystem({
    */
   private chooseSpot(out: Vector3): boolean {
     const eye = this.eye, f = this.forward;
+    // In the wreck the usual spot lands in the seats or beyond the hull: the journey's mark instead.
+    if (this.journeyMark()) {
+      out.set(this.mark.x, 0, this.mark.z);
+      this.finishSpot(out);
+      if (insideCabin(out.x, out.z)) out.y = Math.max(out.y, WRECK.origin.y + WRECK.deckY + HOVER[0]);
+      this.placedFrom.copy(eye);
+      return true;
+    }
     const presenting = this.renderer.xr.isPresenting;
     const camera = this.camera as unknown as { fov?: number; aspect?: number };
     // A flat browser view is narrower than the headset: spots shrink toward it to stay on screen.
@@ -1125,7 +1158,31 @@ export class GuideSystem extends createSystem({
     const calm = priority <= CALM_PRIORITY;
     const urgent = priority >= URGENT_PRIORITY;
     const angles = calm ? SPOT_ANGLES_CALM : SPOT_ANGLES;
-    for (let ai = 0; ai < angles.length; ai++) {
+    // Urgent: a spot well inside the view first (the board's sightline allowed), before the edge of view.
+    if (urgent) {
+      for (let ai = 0; ai < URGENT_ANGLES.length; ai++) {
+        for (let di = 0; di < SPOT_DISTANCES.length; di++) for (let s = 0; s < 2; s++) {
+          const distance = SPOT_DISTANCES[di];
+          if (distance > BAND_FAR) continue;
+          const side = s === 0 ? this.side : -this.side;
+          const angle = Math.min(URGENT_ANGLES[ai], maxAngle) * DEG * side;
+          const c = Math.cos(angle), sn = Math.sin(angle);
+          const dx = f.x * c + f.z * sn, dz = -f.x * sn + f.z * c;
+          const x = eye.x + dx * distance, z = eye.z + dz * distance;
+          if (speed > 0.4 && (dx * this.velocity.x + dz * this.velocity.z) / speed > Math.cos(35 * DEG)) continue;
+          const sight = this.sightlineHit(x, z);
+          if (sight === 2 || !this.clear(x, z, eye.y)) continue;
+          const score = ai * 0.02 + di * 0.03 + s * 0.05 + (sight === 1 ? BOARD_SIGHT_COST : 0);
+          if (score < best) {
+            best = score;
+            bestSide = side;
+            out.set(x, 0, z);
+          }
+        }
+      }
+    }
+    const inView = best < Infinity;
+    for (let ai = 0; ai < angles.length && !inView; ai++) {
       for (let di = 0; di < SPOT_DISTANCES.length; di++) for (let s = 0; s < 2; s++) {
         const side = s === 0 ? this.side : -this.side;
         const angleDeg = angles[ai], distance = SPOT_DISTANCES[di];
@@ -1161,8 +1218,22 @@ export class GuideSystem extends createSystem({
     return best < Infinity;
   }
 
+  /** The journey's pin for the shade this beat (in `mark`), if any. */
+  private journeyMark(): boolean {
+    this.journey ??= this.world.getSystem(JourneySystem);
+    return !!this.journey && shadeMark(this.journey.step, this.mark) !== null;
+  }
+
+  /** The journey has reached `step` (or is not running: before a journey, or past camp). */
+  private journeyAtLeast(step: JourneyStep): boolean {
+    this.journey ??= this.world.getSystem(JourneySystem);
+    const current = this.journey?.step ?? 'done';
+    return JOURNEY_STEPS.indexOf(current) >= JOURNEY_STEPS.indexOf(step);
+  }
+
   /** Whether the current spot still works for the next line (between lines only). */
   private spotGood(): boolean {
+    if (this.journeyMark()) return Math.hypot(this.spot.x - this.mark.x, this.spot.z - this.mark.z) < .6;
     const dx = this.spot.x - this.eye.x, dz = this.spot.z - this.eye.z;
     const distance = Math.hypot(dx, dz);
     if (distance < CLOSE || distance > FAR) return false;
@@ -1174,6 +1245,9 @@ export class GuideSystem extends createSystem({
       && (dx * this.forward.x + dz * this.forward.z) / distance > Math.cos(30 * DEG)) return false;
     // Out at the edge of view (or beyond it): re-formed inside the band before it speaks.
     if ((dx * this.forward.x + dz * this.forward.z) / distance < Math.cos((EDGE_ANGLE + 8) * DEG)) return false;
+    // An urgent line is not spoken from the edge of view: re-formed well inside it.
+    if ((this.current?.priority ?? 10) >= URGENT_PRIORITY
+      && (dx * this.forward.x + dz * this.forward.z) / distance < Math.cos(URGENT_KEEP * DEG)) return false;
     this.refreshSights();
     const sight = this.sightlineHit(this.spot.x, this.spot.z);
     return this.clear(this.spot.x, this.spot.z, this.eye.y)

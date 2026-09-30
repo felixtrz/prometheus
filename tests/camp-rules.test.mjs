@@ -18,13 +18,13 @@ test('pot rejects far, too low, and too high releases', () => {
   assert.equal(inPot(CAMP.pot.x, 1.9, CAMP.pot.z), false);
 });
 test('recipe kinds cannot enter the wrong adjacent bay', () => {
-  for (const kind of ['stick', 'cloth', 'resin']) {
+  for (const kind of ['stick', 'reeds', 'resin']) {
     const slot = materialSlot(kind);
     assert.ok(inMaterialSlot(slot, CAMP.bench.x + CAMP.slotOffsets[slot], CAMP.bench.y, CAMP.bench.z));
     assert.equal(inMaterialSlot((slot + 1) % 3, CAMP.bench.x + CAMP.slotOffsets[slot], CAMP.bench.y, CAMP.bench.z), false);
   }
   assert.equal(materialSlot('meat'), -1);
-  assert.equal(ingredientBit('cloth'), 0);
+  assert.equal(ingredientBit('reeds'), 0);
 });
 test('stirring crosses angle wrap, requires motion, and rejects teleports', () => {
   assert.ok(Math.abs(stirTravel(Math.PI - 0.1, -Math.PI + 0.1) - 0.2) < 1e-8);

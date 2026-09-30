@@ -282,7 +282,12 @@ const crownGeo = ([[0xb4d65c, 0x6d9a35, 0x4a6f2a], [0xa6cc52, 0x62902f, 0x43672a
   g.setAttribute('color', new BufferAttribute(colors, 3));
   return g;
 });
-export function broadleaf(parent: Object3D, x: number, z: number, h: number, yaw: number, variant: number) {
+/**
+ * A broadleaf's meshes in a group at its own foot (origin on the trunk base, unrotated
+ * tree, branch fan turned by `yaw`). ForestSystem draws the standing trees instanced from
+ * a unit (h = 1) copy; the editor sees the 'valley-broadleaves' scene asset.
+ */
+export function broadleafModel(h: number, yaw: number, variant: number): Group {
   const tree = new Group();
   const trunkHeight = h * .5;
   put(tree, paint(new CylinderGeometry(h * .04, h * .066, trunkHeight, 7), 0x8a5f3a, .05), mats.bark, [0, trunkHeight * .5, 0]);
@@ -293,9 +298,23 @@ export function broadleaf(parent: Object3D, x: number, z: number, h: number, yaw
   [[0, .70, 0, .34], [-.26, .58, .12, .26], [.27, .60, -.1, .27], [.05, .56, .28, .24], [-.06, .58, -.27, .23], [-.14, .82, -.04, .22], [.18, .80, .08, .21]].forEach(([bx, by, bz, br], i) => {
     put(tree, crownGeo[(i + variant) % 3], mats.solid, [bx * h, by * h, bz * h], [i * .7, i * 1.3, i * .4], br * h);
   });
-  tree.position.set(x, ground(x, z) - .05, z);
+  return tree;
+}
+/** A broadleaf's trunk base sits this far into the ground (m). */
+export const BROADLEAF_SINK = .05;
+/** A placed broadleaf (for static builds): the model at its foot, turned by `yaw`. */
+export function broadleaf(parent: Object3D, x: number, z: number, h: number, yaw: number, variant: number) {
+  const tree = broadleafModel(h, yaw, variant);
+  tree.position.set(x, ground(x, z) - BROADLEAF_SINK, z);
   tree.rotation.y = yaw;
   parent.add(tree);
+  return tree;
+}
+/**
+ * What a standing broadleaf leaves in the static world: its baked contact shadow and its
+ * trunk collider. The tree itself is drawn by ForestSystem (it can be felled).
+ */
+export function broadleafFootprint(x: number, z: number, h: number) {
   treeShadow(x, z, h, h * .36);
   colliders.push({ type: 'cyl', x, z, r: h * .066 + .06 });
 }

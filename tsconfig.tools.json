@@ -9,5 +9,5 @@
       "/vitexec/*": ["./vitexec/*"]
     }
   },
-  "include": ["src/**/*.ts", "vitexec/**/*.ts", "vite.config.ts", "tests/vitexec.config.ts"]
+  "include": ["src/**/*.ts", "vitexec/**/*.ts", "vite.config.ts"]
 }

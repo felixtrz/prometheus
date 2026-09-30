@@ -1,12 +1,13 @@
 import { Group } from '@iwsdk/core';
 import { dressingPlacements } from './camp-dressing.scene-asset.js';
-import { boulder, broadleaf, campTuft as tuft, FLOWERS, GRASS, litter, pebble, shadow, steppingStone, treeShadow } from './valley-kit.scene-asset.js';
+import { boulder, broadleafFootprint, campTuft as tuft, FLOWERS, GRASS, litter, pebble, shadow, steppingStone, treeShadow } from './valley-kit.scene-asset.js';
 import { BROADLEAVES, TRAILS, trailNearest } from './valley-layout.scene-asset.js';
 import { batchStatic } from './static-batch.js';
 import { noise, smooth, terrainHeight } from '../game/terrain.js';
 
 // Camp region of the valley (adapted from design/source/environment.glts): broadleaf
-// trees, tufts, boulders and trail stones around the clearing, batched to ~4 draws.
+// footprints (the trees themselves are ForestSystem's), tufts, boulders and trail stones
+// around the clearing, batched to ~4 draws.
 // The ground, far forest, horizon and the rest of the valley live in valley-*.scene-asset.ts.
 const root = new Group();
 root.name = 'Prometheus woodland (camp)';
@@ -16,7 +17,8 @@ const campDirt = (x: number, z: number) => {
   return Math.hypot(x / 4, (z + .1) / 3.1) + n * .12 + fine * .05;
 };
 
-for (const t of BROADLEAVES) if (t.region === 'camp') broadleaf(root, t.x, t.z, t.h, t.yaw, t.variant);
+// The camp broadleaves are drawn (and felled) by ForestSystem; the batch keeps their shadow and collider.
+for (const t of BROADLEAVES) if (t.region === 'camp') broadleafFootprint(t.x, t.z, t.h);
 
 /** Kept camp GLB pines (scene nodes woodland-pine-1..6 in main); their shadows are baked here. */
 export const pineSourceBounds = {

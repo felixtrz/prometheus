@@ -5,7 +5,7 @@
   Bundled MSDF fonts only (offline): their atlases are ASCII + Latin-1, so runtime
   text is sanitised to plain punctuation and symbols come from Lucide icons.
   Natural size: 150 x ~100 cm (UIKit units are centimetres).
-  The COMFORT card's chips write src/game/settings.ts (tap to toggle); after the ending the
+  The COMFORT card's chips step src/game/settings.ts (tap to change, cycleSetting); after the ending the
   end card shows the journey's stats and the New journey prompt.
 -->
 <style>
@@ -246,7 +246,7 @@
     flex-shrink: 0;
   }
   .jr-recipe-inputs {
-    font-size: 2.15;
+    font-size: 2.5;
     color: #909f92;
     flex-grow: 1;
   }
@@ -323,7 +323,7 @@
   }
   .jr-chip:hover { background-color: #33473c; }
   .jr-chip-label {
-    font-size: 1.62;
+    font-size: 2.15;
     font-weight: 700;
     color: #a5b2a5;
   }
@@ -344,21 +344,23 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    width: 14.6;
-    padding-top: 0.7;
-    padding-bottom: 0.8;
-    padding-left: 1.3;
-    padding-right: 1.3;
+    gap: 0.8;
+    width: 40%;
+    flex-grow: 1;
+    padding-top: 0.5;
+    padding-bottom: 0.5;
+    padding-left: 1;
+    padding-right: 1;
     border-radius: 0.8;
     background-color: #1e2b24;
   }
   .jr-stat-label {
-    font-size: 1.6;
+    font-size: 2.1;
     font-weight: 700;
     color: #a5b2a5;
   }
   .jr-stat-val {
-    font-size: 2.7;
+    font-size: 2.5;
     font-weight: 700;
     color: #d4b180;
   }
@@ -402,10 +404,10 @@
       <div id="jr-obj-card" class="jr-card jr-focus">
         <div class="jr-row">
           <span class="jr-eyebrow">NOW</span>
-          <span id="jr-obj-num" class="jr-num">1 OF 10</span>
+          <span id="jr-obj-num" class="jr-num">1 OF 13</span>
         </div>
-        <div id="jr-obj-title" class="jr-obj-title">Light the campfire</div>
-        <div id="jr-obj-hint" class="jr-obj-hint">Read the note in your pack, then take the lighter. Pull the trigger and hold the flame to the fire.</div>
+        <div id="jr-obj-title" class="jr-obj-title">Get out of the wreck</div>
+        <div id="jr-obj-hint" class="jr-obj-hint">Walk to the door at the front. The emergency axe hangs above it: take it and strike the door until it gives.</div>
         <div id="jr-tonight-row" class="jr-tonight-row">
           <Moon class="jr-tonight-icon"></Moon>
           <span class="jr-tonight">Tonight: Survive the night, then sleep</span>
@@ -459,16 +461,19 @@
       <div class="jr-card">
         <div class="jr-row">
           <span class="jr-eyebrow">OBJECTIVES</span>
-          <span id="jr-obj-count" class="jr-num">0 / 10</span>
+          <span id="jr-obj-count" class="jr-num">0 / 13</span>
         </div>
         <div class="jr-list">
+          <div class="jr-item"><div id="jr-o10-box" class="jr-box"><Check id="jr-o10-tick" class="jr-tick"></Check></div><span id="jr-o10-text" class="jr-item-text">Get out of the wreck</span></div>
+          <div class="jr-item"><div id="jr-o11-box" class="jr-box"><Check id="jr-o11-tick" class="jr-tick"></Check></div><span id="jr-o11-text" class="jr-item-text">Find your pack at the waystation</span></div>
+          <div class="jr-item"><div id="jr-o12-box" class="jr-box"><Check id="jr-o12-tick" class="jr-tick"></Check></div><span id="jr-o12-text" class="jr-item-text">Firewood and mushrooms</span></div>
           <div class="jr-item"><div id="jr-o0-box" class="jr-box"><Check id="jr-o0-tick" class="jr-tick"></Check></div><span id="jr-o0-text" class="jr-item-text">Light the campfire</span></div>
           <div class="jr-item"><div id="jr-o1-box" class="jr-box"><Check id="jr-o1-tick" class="jr-tick"></Check></div><span id="jr-o1-text" class="jr-item-text">Cook a meal and eat it</span></div>
           <div class="jr-item"><div id="jr-o2-box" class="jr-box"><Check id="jr-o2-tick" class="jr-tick"></Check></div><span id="jr-o2-text" class="jr-item-text">Craft a torch and light it</span></div>
           <div class="jr-item"><div id="jr-o3-box" class="jr-box"><Check id="jr-o3-tick" class="jr-tick"></Check></div><span id="jr-o3-text" class="jr-item-text">Sleep at the bedroll</span></div>
           <div class="jr-item"><div id="jr-o4-box" class="jr-box"><Check id="jr-o4-tick" class="jr-tick"></Check></div><span id="jr-o4-text" class="jr-item-text">Craft a spear</span></div>
           <div class="jr-item"><div id="jr-o5-box" class="jr-box"><Check id="jr-o5-tick" class="jr-tick"></Check></div><span id="jr-o5-text" class="jr-item-text">Hunt for meat</span></div>
-          <div class="jr-item"><div id="jr-o6-box" class="jr-box"><Check id="jr-o6-tick" class="jr-tick"></Check></div><span id="jr-o6-text" class="jr-item-text">Find the expedition outpost</span></div>
+          <div class="jr-item"><div id="jr-o6-box" class="jr-box"><Check id="jr-o6-tick" class="jr-tick"></Check></div><span id="jr-o6-text" class="jr-item-text">Find the high outpost</span></div>
           <div class="jr-item"><div id="jr-o7-box" class="jr-box"><Check id="jr-o7-tick" class="jr-tick"></Check></div><span id="jr-o7-text" class="jr-item-text">Craft the crossbow</span></div>
           <div class="jr-item"><div id="jr-o8-box" class="jr-box"><Check id="jr-o8-tick" class="jr-tick"></Check></div><span id="jr-o8-text" class="jr-item-text">Build a sentry for camp</span></div>
           <div class="jr-item"><div id="jr-o9-box" class="jr-box"><Check id="jr-o9-tick" class="jr-tick"></Check></div><span id="jr-o9-text" class="jr-item-text">Carry fire to the Spire</span></div>
@@ -482,12 +487,15 @@
         </div>
         <div class="jr-set-grid">
           <div class="jr-set-row">
-            <button id="jr-set-speed" class="jr-chip"><span class="jr-chip-label">WALKING SPEED</span><span id="jr-set-speed-val" class="jr-chip-val">Normal</span></button>
-            <button id="jr-set-tunnel" class="jr-chip"><span class="jr-chip-label">COMFORT TUNNEL</span><span id="jr-set-tunnel-val" class="jr-chip-val">On</span></button>
+            <button id="jr-set-speed" class="jr-chip"><span class="jr-chip-label">WALK SPEED</span><span id="jr-set-speed-val" class="jr-chip-val">Normal</span></button>
+            <button id="jr-set-turn" class="jr-chip"><span class="jr-chip-label">TURNING</span><span id="jr-set-turn-val" class="jr-chip-val">Snap 45°</span></button>
+          </div>
+          <div class="jr-set-row">
+            <button id="jr-set-tunnel" class="jr-chip"><span class="jr-chip-label">TUNNEL</span><span id="jr-set-tunnel-val" class="jr-chip-val">On</span></button>
+            <button id="jr-set-subs" class="jr-chip"><span class="jr-chip-label">SUBTITLES</span><span id="jr-set-subs-val" class="jr-chip-val">On</span></button>
           </div>
           <div class="jr-set-row">
             <button id="jr-set-flashes" class="jr-chip"><span class="jr-chip-label">REDUCE FLASHES</span><span id="jr-set-flashes-val" class="jr-chip-val">Off</span></button>
-            <button id="jr-set-subs" class="jr-chip"><span class="jr-chip-label">SUBTITLES</span><span id="jr-set-subs-val" class="jr-chip-val">On</span></button>
           </div>
         </div>
       </div>
@@ -505,6 +513,13 @@
           <div class="jr-recipe"><span id="jr-r2-name" class="jr-recipe-name">Bolt bundle</span><span id="jr-r2-inputs" class="jr-recipe-inputs">Page 4, on a rock by the brook</span></div>
           <div class="jr-recipe"><span id="jr-r3-name" class="jr-recipe-name">Crossbow</span><span id="jr-r3-inputs" class="jr-recipe-inputs">Page 5, on the outpost table</span></div>
           <div class="jr-recipe"><span id="jr-r4-name" class="jr-recipe-name">Sentry kit</span><span id="jr-r4-inputs" class="jr-recipe-inputs">Page 6, below the lookout</span></div>
+        </div>
+        <span class="jr-eyebrow" style="margin-top: 2.4">PARTS</span>
+        <div class="jr-list" style="gap: 0.9; margin-top: 1.2">
+          <div class="jr-recipe"><span id="jr-r5-name" class="jr-recipe-name">Cord</span><span id="jr-r5-inputs" class="jr-recipe-inputs">3 reeds</span></div>
+          <div class="jr-recipe"><span id="jr-r6-name" class="jr-recipe-name">Plank</span><span id="jr-r6-inputs" class="jr-recipe-inputs">2 sticks, resin</span></div>
+          <div class="jr-recipe"><span id="jr-r7-name" class="jr-recipe-name">Trigger latch</span><span id="jr-r7-inputs" class="jr-recipe-inputs">plank, stick, flint</span></div>
+          <div class="jr-recipe"><span id="jr-r8-name" class="jr-recipe-name">Bow limb</span><span id="jr-r8-inputs" class="jr-recipe-inputs">stick, cord, resin</span></div>
         </div>
       </div>
 

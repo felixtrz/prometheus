@@ -203,17 +203,22 @@
           }
         },
         {
-          "id": "a-spring",
-          "name": "spring",
+          "id": "a-limb",
+          "name": "limb",
           "content": {
             "type": "asset",
-            "asset": "spring"
+            "asset": "limb"
           },
           "transform": {
             "position": [
               -0.39,
               1.02,
               0
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              90
             ]
           }
         },
@@ -377,11 +382,11 @@
           }
         },
         {
-          "id": "b-cloth",
-          "name": "cloth",
+          "id": "b-reeds",
+          "name": "reeds",
           "content": {
             "type": "asset",
-            "asset": "cloth"
+            "asset": "reeds"
           },
           "transform": {
             "position": [

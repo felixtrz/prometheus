@@ -164,6 +164,7 @@ export class CampfireSystem extends createSystem({
     let wolves = 0;
     for (const creature of this.queries.creatures.entities) {
       if (creature.getValue(Creature, 'species') !== 'wolf' || (creature.getValue(Creature, 'health') ?? 0) <= 0) continue;
+      if (creature.getValue(Creature, 'mode') === 'dying') continue;
       const p = creature.object3D?.position;
       if (p && Math.hypot(p.x - CAMP.fire.x, p.z - CAMP.fire.z) < 10) wolves++;
     }

@@ -3,7 +3,7 @@ import { bus } from '../bus.js';
 import { itemInfo } from '../catalog.js';
 import { CraftBench, GameState, Held, Item } from '../components.js';
 import { pulse } from '../haptics.js';
-import { BENCH_RECIPES, BOLTS_PER_BUNDLE, matchBench, recipeBit } from '../recipes.js';
+import { BENCH_RECIPES, BOLTS_PER_BUNDLE, knownRecipes, matchBench, recipeBit } from '../recipes.js';
 import { benchBayAt, CAMP } from '../rules.js';
 import { ItemSystem } from './item-system.js';
 
@@ -106,7 +106,7 @@ export class CraftingSystem extends createSystem({
   /** Say whether three filled bays make something, before the first strike. */
   private announceSet(index: number): void {
     const game = this.game;
-    const known = index >= 0 && !!game && ((game.getValue(GameState, 'recipes') ?? 0) & recipeBit(index)) !== 0;
+    const known = index >= 0 && !!game && (knownRecipes(game.getValue(GameState, 'recipes') ?? 0) & recipeBit(index)) !== 0;
     const product = index >= 0 ? BENCH_RECIPES[index].product : '';
     bus.emit({ type: 'bench-set', product, valid: index >= 0, known });
     if (index < 0) bus.emit({ type: 'toast', tone: 'warn', text: 'These three don\u2019t fit together', body: 'Take one out and try another part.' });
@@ -199,8 +199,9 @@ export class CraftingSystem extends createSystem({
     const game = this.game;
     let learned = false;
     if (game && index >= 0) {
+      // Parts are known from the start: only a product can be learned at the bench.
       const known = game.getValue(GameState, 'recipes') ?? 0;
-      learned = !(known & recipeBit(index));
+      learned = !(knownRecipes(known) & recipeBit(index));
       if (learned) game.setValue(GameState, 'recipes', known | recipeBit(index));
     }
     const { x, y, z } = CAMP.work;

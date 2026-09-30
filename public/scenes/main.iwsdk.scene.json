@@ -48,9 +48,14 @@
   "player": {
     "transform": {
       "position": [
+        -22.86,
+        0.2,
+        4.42
+      ],
+      "rotationDeg": [
         0,
-        0,
-        0.4
+        -90,
+        0
       ]
     }
   },
@@ -101,19 +106,115 @@
         "role": "hero",
         "projection": "perspective",
         "position": [
-          0,
-          2.25,
-          4.3
+          -22.86,
+          1.85,
+          4.42
         ],
         "target": [
-          0,
-          0.9,
-          -2
+          -17.5,
+          1.55,
+          4.1
         ],
-        "fov": 62
+        "fov": 75
       },
       {
         "id": "spawn",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -22.86,
+          1.85,
+          4.42
+        ],
+        "target": [
+          -17.5,
+          1.6,
+          4.1
+        ],
+        "fov": 90
+      },
+      {
+        "id": "wreck-door",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -20.4,
+          1.85,
+          4.0
+        ],
+        "target": [
+          -18.7,
+          1.5,
+          2.8
+        ],
+        "fov": 90
+      },
+      {
+        "id": "wreck-outside",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -14.5,
+          4.2,
+          -5.5
+        ],
+        "target": [
+          -22,
+          0.8,
+          4.5
+        ],
+        "fov": 70
+      },
+      {
+        "id": "wreck-wolves",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -18.7,
+          1.7,
+          0.6
+        ],
+        "target": [
+          -30,
+          3,
+          6
+        ],
+        "fov": 90
+      },
+      {
+        "id": "waystation",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -22.4,
+          1.7,
+          -3.4
+        ],
+        "target": [
+          -27.3,
+          0.9,
+          -5.7
+        ],
+        "fov": 70
+      },
+      {
+        "id": "journey-forest",
+        "role": "diagnostic",
+        "projection": "perspective",
+        "position": [
+          -21.4,
+          1.9,
+          -10.9
+        ],
+        "target": [
+          -12,
+          1.2,
+          -10.2
+        ],
+        "fov": 80
+      },
+      {
+        "id": "camp-arrival",
         "role": "diagnostic",
         "projection": "perspective",
         "position": [
@@ -399,22 +500,6 @@
           -29.1
         ],
         "fov": 60
-      },
-      {
-        "id": "grove-deadwood",
-        "role": "diagnostic",
-        "projection": "perspective",
-        "position": [
-          -10.2,
-          1.8,
-          -10.6
-        ],
-        "target": [
-          -12,
-          0.3,
-          -13
-        ],
-        "fov": 60
       }
     ]
   },
@@ -426,7 +511,10 @@
         "type": "group"
       },
       "components": {
-        "GameState": {}
+        "GameState": {
+          "clock": 486,
+          "day": 0
+        }
       }
     },
     {
@@ -480,7 +568,9 @@
       },
       "components": {
         "FireVisual": {},
-        "Campfire": {}
+        "Campfire": {
+          "fuel": 0
+        }
       }
     },
     {
@@ -547,14 +637,14 @@
       },
       "transform": {
         "position": [
-          1.96,
-          0.79,
-          -0.7
+          -27,
+          0.713,
+          -5.7
         ]
       },
       "components": {
         "Backpack": {
-          "state": "unrolled"
+          "state": "unowned"
         }
       }
     },
@@ -625,28 +715,6 @@
       }
     },
     {
-      "id": "item-mushroom",
-      "name": "Item Mushroom",
-      "content": {
-        "type": "asset",
-        "asset": "mushroom"
-      },
-      "transform": {
-        "position": [
-          1.96,
-          1.04,
-          -0.4
-        ]
-      },
-      "components": {
-        "Item": {
-          "kind": "mushroom",
-          "uid": "item-mushroom",
-          "slot": "pack-1"
-        }
-      }
-    },
-    {
       "id": "item-spoon",
       "name": "Item Spoon",
       "content": {
@@ -699,11 +767,11 @@
       }
     },
     {
-      "id": "item-cloth",
-      "name": "Item Cloth",
+      "id": "item-reeds",
+      "name": "Item Reeds",
       "content": {
         "type": "asset",
-        "asset": "cloth"
+        "asset": "reeds"
       },
       "transform": {
         "position": [
@@ -714,8 +782,8 @@
       },
       "components": {
         "Item": {
-          "kind": "cloth",
-          "uid": "item-cloth",
+          "kind": "reeds",
+          "uid": "item-reeds",
           "slot": "pack-3"
         }
       }
@@ -803,7 +871,7 @@
         "Item": {
           "kind": "lighter",
           "uid": "item-lighter",
-          "slot": "pack-4"
+          "slot": "hip-left"
         }
       }
     },
@@ -863,79 +931,27 @@
     },
     {
       "id": "camp-axe",
-      "name": "Camp Axe",
+      "name": "Emergency Axe",
       "content": {
         "type": "asset",
         "asset": "axe"
       },
       "transform": {
         "position": [
-          2.5695,
-          0.6194,
-          -3.0928
+          -18.7,
+          1.98,
+          2.93
         ],
         "rotationDeg": [
-          -109.737,
-          15.662,
-          -36.959
+          -90,
+          0,
+          -90
         ]
       },
       "components": {
         "Item": {
           "kind": "axe",
           "uid": "camp-axe"
-        }
-      }
-    },
-    {
-      "id": "item-log-1",
-      "name": "Item Log 1",
-      "content": {
-        "type": "asset",
-        "asset": "log"
-      },
-      "transform": {
-        "position": [
-          2.2,
-          0.081,
-          -2.72
-        ],
-        "rotationDeg": [
-          0,
-          70,
-          90
-        ]
-      },
-      "components": {
-        "Item": {
-          "kind": "log",
-          "uid": "item-log-1"
-        }
-      }
-    },
-    {
-      "id": "item-log-2",
-      "name": "Item Log 2",
-      "content": {
-        "type": "asset",
-        "asset": "log"
-      },
-      "transform": {
-        "position": [
-          2.42,
-          0.081,
-          -2.58
-        ],
-        "rotationDeg": [
-          0,
-          98,
-          90
-        ]
-      },
-      "components": {
-        "Item": {
-          "kind": "log",
-          "uid": "item-log-2"
         }
       }
     },
@@ -1104,13 +1120,13 @@
       },
       "transform": {
         "position": [
-          1.117,
-          0.976,
-          -0.7
+          -27,
+          0.82,
+          -5.7
         ],
         "rotationDeg": [
           0,
-          90,
+          170,
           0
         ]
       },
@@ -1700,119 +1716,6 @@
           }
         },
         {
-          "id": "grove-pine-7",
-          "content": {
-            "type": "asset",
-            "asset": "pine-1",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -23.3,
-              0.108,
-              -5.5
-            ],
-            "rotationDeg": [
-              0,
-              300,
-              0
-            ],
-            "scale": [
-              0.88,
-              0.88,
-              0.88
-            ]
-          }
-        },
-        {
-          "id": "grove-deadwood-1",
-          "content": {
-            "type": "asset",
-            "asset": "deadwood",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -17.4,
-              -0.034,
-              -6
-            ],
-            "rotationDeg": [
-              0,
-              18,
-              0
-            ]
-          },
-          "components": {
-            "ResourceNode": {
-              "kind": "deadwood",
-              "yields": "log,stick,stick",
-              "hitsNeeded": 3,
-              "regrowSeconds": 240
-            }
-          }
-        },
-        {
-          "id": "grove-deadwood-2",
-          "content": {
-            "type": "asset",
-            "asset": "deadwood",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -22.6,
-              0.161,
-              -10.4
-            ],
-            "rotationDeg": [
-              0,
-              -62,
-              0
-            ]
-          },
-          "components": {
-            "ResourceNode": {
-              "kind": "deadwood",
-              "yields": "log,stick,stick",
-              "hitsNeeded": 3,
-              "regrowSeconds": 240
-            }
-          }
-        },
-        {
-          "id": "grove-deadwood-3",
-          "content": {
-            "type": "asset",
-            "asset": "deadwood",
-            "castShadow": false,
-            "receiveShadow": false
-          },
-          "transform": {
-            "position": [
-              -12,
-              1.07,
-              -13
-            ],
-            "rotationDeg": [
-              0,
-              40,
-              0
-            ]
-          },
-          "components": {
-            "ResourceNode": {
-              "kind": "deadwood",
-              "yields": "log,stick,stick",
-              "hitsNeeded": 3,
-              "regrowSeconds": 240
-            }
-          }
-        },
-        {
           "id": "grove-resin-1",
           "content": {
             "type": "asset",
@@ -1836,7 +1739,6 @@
             "ResourceNode": {
               "kind": "resin",
               "yields": "resin",
-              "hitsNeeded": 0,
               "regrowSeconds": 180
             }
           }
@@ -1865,7 +1767,6 @@
             "ResourceNode": {
               "kind": "resin",
               "yields": "resin",
-              "hitsNeeded": 0,
               "regrowSeconds": 180
             }
           }
@@ -1894,7 +1795,34 @@
             "ResourceNode": {
               "kind": "resin",
               "yields": "resin",
-              "hitsNeeded": 0,
+              "regrowSeconds": 180
+            }
+          }
+        },
+        {
+          "id": "grove-resin-4",
+          "content": {
+            "type": "asset",
+            "asset": "resin-scar",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              -11.457,
+              1.424,
+              -5.333
+            ],
+            "rotationDeg": [
+              0,
+              65,
+              0
+            ]
+          },
+          "components": {
+            "ResourceNode": {
+              "kind": "resin",
+              "yields": "resin",
               "regrowSeconds": 180
             }
           }
@@ -2277,8 +2205,8 @@
           "components": {
             "ResourceNode": {
               "kind": "reeds",
-              "yields": "cord",
-              "regrowSeconds": 180
+              "yields": "reeds,reeds,reeds",
+              "regrowSeconds": 120
             }
           }
         },
@@ -2305,8 +2233,8 @@
           "components": {
             "ResourceNode": {
               "kind": "reeds",
-              "yields": "cord",
-              "regrowSeconds": 180
+              "yields": "reeds,reeds,reeds",
+              "regrowSeconds": 120
             }
           }
         },
@@ -2333,8 +2261,8 @@
           "components": {
             "ResourceNode": {
               "kind": "reeds",
-              "yields": "cord",
-              "regrowSeconds": 180
+              "yields": "reeds,reeds,reeds",
+              "regrowSeconds": 120
             }
           }
         },
@@ -2379,6 +2307,62 @@
               22.454,
               -0.185,
               -13.4
+            ],
+            "rotationDeg": [
+              0,
+              170,
+              0
+            ]
+          },
+          "components": {
+            "ResourceNode": {
+              "kind": "flint",
+              "yields": "flint",
+              "regrowSeconds": 180
+            }
+          }
+        },
+        {
+          "id": "brook-flint-3",
+          "content": {
+            "type": "asset",
+            "asset": "flint-bed",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              18.771,
+              -0.202,
+              -19.5
+            ],
+            "rotationDeg": [
+              0,
+              30,
+              0
+            ]
+          },
+          "components": {
+            "ResourceNode": {
+              "kind": "flint",
+              "yields": "flint",
+              "regrowSeconds": 180
+            }
+          }
+        },
+        {
+          "id": "brook-flint-4",
+          "content": {
+            "type": "asset",
+            "asset": "flint-bed",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              21.408,
+              -0.094,
+              -24
             ],
             "rotationDeg": [
               0,
@@ -2474,15 +2458,7 @@
               0
             ]
           },
-          "components": {
-            "ResourceNode": {
-              "kind": "canvas",
-              "yields": "cloth",
-              "hitsNeeded": 0,
-              "regrowSeconds": 240
-            }
-          },
-          "name": "Tent canvas (renewable cloth)"
+          "name": "Torn tent canvas (decor)"
         },
         {
           "id": "outpost-brazier",
@@ -2888,6 +2864,24 @@
       },
       "framingRole": "support",
       "children": [
+        {
+          "id": "valley-broadleaves",
+          "name": "Valley broadleaves",
+          "framingRole": "support",
+          "content": {
+            "type": "asset",
+            "asset": "valley-broadleaves",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
         {
           "id": "valley-pines-west-tall",
           "framingRole": "support",
@@ -3386,23 +3380,6 @@
             "distribution": {
               "type": "explicit",
               "transforms": [
-                {
-                  "position": [
-                    -27.3,
-                    -0.114,
-                    -9.94
-                  ],
-                  "rotationDeg": [
-                    0,
-                    58,
-                    0
-                  ],
-                  "scale": [
-                    0.989,
-                    1.139,
-                    0.989
-                  ]
-                },
                 {
                   "position": [
                     -7.38,
@@ -3945,23 +3922,6 @@
                 },
                 {
                   "position": [
-                    -26.22,
-                    -0.103,
-                    -7.56
-                  ],
-                  "rotationDeg": [
-                    0,
-                    136,
-                    0
-                  ],
-                  "scale": [
-                    1.07,
-                    1.201,
-                    1.07
-                  ]
-                },
-                {
-                  "position": [
                     -15.02,
                     0.051,
                     -5.97
@@ -3979,57 +3939,6 @@
                 },
                 {
                   "position": [
-                    -32.87,
-                    1.247,
-                    8.32
-                  ],
-                  "rotationDeg": [
-                    0,
-                    235,
-                    0
-                  ],
-                  "scale": [
-                    0.947,
-                    1.025,
-                    0.947
-                  ]
-                },
-                {
-                  "position": [
-                    -33.63,
-                    2.595,
-                    -2.87
-                  ],
-                  "rotationDeg": [
-                    0,
-                    53,
-                    0
-                  ],
-                  "scale": [
-                    1.189,
-                    1.126,
-                    1.189
-                  ]
-                },
-                {
-                  "position": [
-                    -33.7,
-                    2.52,
-                    3.34
-                  ],
-                  "rotationDeg": [
-                    0,
-                    246,
-                    0
-                  ],
-                  "scale": [
-                    0.885,
-                    0.974,
-                    0.885
-                  ]
-                },
-                {
-                  "position": [
                     -32.4,
                     0.491,
                     12.18
@@ -4043,23 +3952,6 @@
                     1.073,
                     1.317,
                     1.073
-                  ]
-                },
-                {
-                  "position": [
-                    -24.53,
-                    0.477,
-                    12.29
-                  ],
-                  "rotationDeg": [
-                    0,
-                    115,
-                    0
-                  ],
-                  "scale": [
-                    0.821,
-                    0.906,
-                    0.821
                   ]
                 },
                 {
@@ -4094,125 +3986,6 @@
                     1.053,
                     1.363,
                     1.053
-                  ]
-                },
-                {
-                  "position": [
-                    -29.92,
-                    -0.124,
-                    -4.38
-                  ],
-                  "rotationDeg": [
-                    0,
-                    299,
-                    0
-                  ],
-                  "scale": [
-                    0.909,
-                    0.829,
-                    0.909
-                  ]
-                },
-                {
-                  "position": [
-                    -29.05,
-                    -0.069,
-                    4.17
-                  ],
-                  "rotationDeg": [
-                    0,
-                    19,
-                    0
-                  ],
-                  "scale": [
-                    1.043,
-                    1.292,
-                    1.043
-                  ]
-                },
-                {
-                  "position": [
-                    -25.57,
-                    -0.075,
-                    3.48
-                  ],
-                  "rotationDeg": [
-                    0,
-                    69,
-                    0
-                  ],
-                  "scale": [
-                    0.893,
-                    1.069,
-                    0.893
-                  ]
-                },
-                {
-                  "position": [
-                    -19.95,
-                    -0.33,
-                    3.14
-                  ],
-                  "rotationDeg": [
-                    0,
-                    272,
-                    0
-                  ],
-                  "scale": [
-                    0.814,
-                    0.786,
-                    0.814
-                  ]
-                },
-                {
-                  "position": [
-                    -28.58,
-                    -0.165,
-                    -0.01
-                  ],
-                  "rotationDeg": [
-                    0,
-                    219,
-                    0
-                  ],
-                  "scale": [
-                    1.059,
-                    1.368,
-                    1.059
-                  ]
-                },
-                {
-                  "position": [
-                    -19.84,
-                    -0.215,
-                    8.39
-                  ],
-                  "rotationDeg": [
-                    0,
-                    85,
-                    0
-                  ],
-                  "scale": [
-                    0.836,
-                    0.731,
-                    0.836
-                  ]
-                },
-                {
-                  "position": [
-                    -16.81,
-                    -0.476,
-                    4.16
-                  ],
-                  "rotationDeg": [
-                    0,
-                    289,
-                    0
-                  ],
-                  "scale": [
-                    0.822,
-                    0.927,
-                    0.822
                   ]
                 }
               ]
@@ -4494,23 +4267,6 @@
                 },
                 {
                   "position": [
-                    -21.16,
-                    -0.298,
-                    -2.8
-                  ],
-                  "rotationDeg": [
-                    0,
-                    355,
-                    0
-                  ],
-                  "scale": [
-                    1.076,
-                    1.35,
-                    1.076
-                  ]
-                },
-                {
-                  "position": [
                     -14.78,
                     -0.231,
                     10.34
@@ -4588,23 +4344,6 @@
                     0.807,
                     0.922,
                     0.807
-                  ]
-                },
-                {
-                  "position": [
-                    -12.36,
-                    -0.343,
-                    6.85
-                  ],
-                  "rotationDeg": [
-                    0,
-                    52,
-                    0
-                  ],
-                  "scale": [
-                    0.949,
-                    1.136,
-                    0.949
                   ]
                 }
               ]
@@ -6370,23 +6109,6 @@
                     1.036,
                     0.965,
                     1.036
-                  ]
-                },
-                {
-                  "position": [
-                    -24.02,
-                    3.324,
-                    15.56
-                  ],
-                  "rotationDeg": [
-                    0,
-                    30,
-                    0
-                  ],
-                  "scale": [
-                    0.865,
-                    0.857,
-                    0.865
                   ]
                 },
                 {
@@ -10341,23 +10063,6 @@
                 },
                 {
                   "position": [
-                    -36.47,
-                    4.829,
-                    7.41
-                  ],
-                  "rotationDeg": [
-                    0,
-                    170,
-                    0
-                  ],
-                  "scale": [
-                    1.241,
-                    1.608,
-                    1.241
-                  ]
-                },
-                {
-                  "position": [
                     -42.85,
                     11.031,
                     -7.18
@@ -11286,132 +10991,154 @@
       }
     },
     {
-      "id": "item-salvage-trigger",
-      "name": "Salvage Trigger",
+      "id": "camp-nodes",
+      "name": "Camp forage (reeds, resin)",
       "content": {
-        "type": "asset",
-        "asset": "trigger"
+        "type": "group"
       },
       "transform": {
         "position": [
-          -5.9,
-          1.13,
-          -29.003
-        ],
-        "rotationDeg": [
           0,
-          38,
+          0,
           0
         ]
       },
-      "components": {
-        "Item": {
-          "kind": "trigger",
-          "uid": "item-salvage-trigger"
+      "children": [
+        {
+          "id": "camp-reeds-1",
+          "content": {
+            "type": "asset",
+            "asset": "reed-clump",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              3.8,
+              0,
+              1.4
+            ],
+            "rotationDeg": [
+              0,
+              -90,
+              0
+            ]
+          },
+          "components": {
+            "ResourceNode": {
+              "kind": "reeds",
+              "yields": "reeds,reeds,reeds",
+              "regrowSeconds": 90
+            }
+          }
+        },
+        {
+          "id": "camp-reeds-2",
+          "content": {
+            "type": "asset",
+            "asset": "reed-clump",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              -3.8,
+              0,
+              1.2
+            ],
+            "rotationDeg": [
+              0,
+              90,
+              0
+            ]
+          },
+          "components": {
+            "ResourceNode": {
+              "kind": "reeds",
+              "yields": "reeds,reeds,reeds",
+              "regrowSeconds": 90
+            }
+          }
+        },
+        {
+          "id": "camp-resin-1",
+          "content": {
+            "type": "asset",
+            "asset": "resin-scar",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              -5.068,
+              0.946,
+              -1.6
+            ],
+            "rotationDeg": [
+              0,
+              90,
+              0
+            ]
+          },
+          "components": {
+            "ResourceNode": {
+              "kind": "resin",
+              "yields": "resin",
+              "regrowSeconds": 180
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "id": "item-salvage-spring",
-      "name": "Salvage Spring",
+      "id": "item-stick-8",
+      "name": "Item Stick 8",
       "content": {
         "type": "asset",
-        "asset": "spring"
+        "asset": "stick"
       },
       "transform": {
         "position": [
-          -5.684,
-          1.14,
-          -29.179
+          1.5,
+          0.045,
+          2.0
         ],
         "rotationDeg": [
           0,
-          -12,
-          0
-        ]
-      },
-      "components": {
-        "Item": {
-          "kind": "spring",
-          "uid": "item-salvage-spring"
-        }
-      }
-    },
-    {
-      "id": "item-salvage-cloth",
-      "name": "Salvage Cloth",
-      "content": {
-        "type": "asset",
-        "asset": "cloth"
-      },
-      "transform": {
-        "position": [
-          -5.428,
-          1.223,
-          -29.136
-        ],
-        "rotationDeg": [
-          0,
-          108,
-          0
-        ]
-      },
-      "components": {
-        "Item": {
-          "kind": "cloth",
-          "uid": "item-salvage-cloth"
-        }
-      }
-    },
-    {
-      "id": "item-salvage-plank-1",
-      "name": "Salvage Plank 1",
-      "content": {
-        "type": "asset",
-        "asset": "plank"
-      },
-      "transform": {
-        "position": [
-          -6.462,
-          0.731,
-          -28.726
-        ],
-        "rotationDeg": [
-          0,
-          22,
+          40,
           90
         ]
       },
       "components": {
         "Item": {
-          "kind": "plank",
-          "uid": "item-salvage-plank-1"
+          "kind": "stick",
+          "uid": "item-stick-8"
         }
       }
     },
     {
-      "id": "item-salvage-plank-2",
-      "name": "Salvage Plank 2",
+      "id": "item-stick-9",
+      "name": "Item Stick 9",
       "content": {
         "type": "asset",
-        "asset": "plank"
+        "asset": "stick"
       },
       "transform": {
         "position": [
-          -6.58,
-          0.735,
-          -29.024
+          -2.4,
+          0.045,
+          2.3
         ],
         "rotationDeg": [
           0,
-          12,
+          -65,
           90
         ]
       },
       "components": {
         "Item": {
-          "kind": "plank",
-          "uid": "item-salvage-plank-2"
+          "kind": "stick",
+          "uid": "item-stick-9"
         }
       }
     },
@@ -11435,6 +11162,422 @@
       },
       "name": "Valley colliders",
       "framingRole": "support"
+    },
+    {
+      "id": "wreck",
+      "name": "Plane Wreck",
+      "content": {
+        "type": "asset",
+        "asset": "plane-wreck",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -22,
+          -0.15,
+          4
+        ]
+      }
+    },
+    {
+      "id": "wreck-deck",
+      "name": "Wreck Deck",
+      "content": {
+        "type": "asset",
+        "asset": "wreck-deck",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -22,
+          -0.15,
+          4
+        ]
+      },
+      "components": {
+        "ItemSurface": {
+          "inset": 0.05,
+          "lift": 0
+        },
+        "LocomotionEnvironment": {}
+      }
+    },
+    {
+      "id": "wreck-walls",
+      "name": "Wreck Walls",
+      "content": {
+        "type": "asset",
+        "asset": "wreck-walls",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -22,
+          -0.15,
+          4
+        ]
+      },
+      "components": {
+        "LocomotionEnvironment": {}
+      }
+    },
+    {
+      "id": "wreck-door-blocker",
+      "name": "Wreck Door Blocker",
+      "content": {
+        "type": "asset",
+        "asset": "wreck-door-blocker",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -22,
+          -0.15,
+          4
+        ]
+      },
+      "components": {
+        "LocomotionEnvironment": {
+          "type": "kinematic"
+        }
+      }
+    },
+    {
+      "id": "waystation",
+      "name": "Waystation",
+      "content": {
+        "type": "asset",
+        "asset": "waystation",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -27.6,
+          -0.071,
+          -5.6
+        ],
+        "rotationDeg": [
+          0,
+          80,
+          0
+        ]
+      }
+    },
+    {
+      "id": "waystation-table",
+      "name": "Waystation Table",
+      "content": {
+        "type": "asset",
+        "asset": "waystation-table",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -27,
+          -0.067,
+          -5.7
+        ],
+        "rotationDeg": [
+          0,
+          80,
+          0
+        ]
+      },
+      "components": {
+        "ItemSurface": {
+          "inset": 0.05,
+          "lift": 0
+        }
+      }
+    },
+    {
+      "id": "journey-markers",
+      "name": "Journey Markers",
+      "content": {
+        "type": "asset",
+        "asset": "journey-markers",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "forest-mushroom-1",
+      "name": "Forest Mushroom 1",
+      "content": {
+        "type": "asset",
+        "asset": "mushroom-patch",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -22.9,
+          0.066,
+          -8.6
+        ],
+        "rotationDeg": [
+          0,
+          40,
+          0
+        ]
+      },
+      "components": {
+        "ResourceNode": {
+          "kind": "mushroom",
+          "yields": "mushroom",
+          "regrowSeconds": 180
+        }
+      }
+    },
+    {
+      "id": "forest-mushroom-2",
+      "name": "Forest Mushroom 2",
+      "content": {
+        "type": "asset",
+        "asset": "mushroom-patch",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -9.6,
+          0.891,
+          -9.9
+        ],
+        "rotationDeg": [
+          0,
+          -60,
+          0
+        ]
+      },
+      "components": {
+        "ResourceNode": {
+          "kind": "mushroom",
+          "yields": "mushroom",
+          "regrowSeconds": 180
+        }
+      }
+    },
+    {
+      "id": "journey-pine-1",
+      "content": {
+        "type": "asset",
+        "asset": "pine-1",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -23.39,
+          0.344,
+          -13.31
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.82,
+          0.82,
+          0.82
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-2",
+      "content": {
+        "type": "asset",
+        "asset": "pine-2",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -18.4,
+          0.792,
+          -13
+        ],
+        "rotationDeg": [
+          0,
+          83,
+          0
+        ],
+        "scale": [
+          0.86,
+          0.86,
+          0.86
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-3",
+      "content": {
+        "type": "asset",
+        "asset": "pine-1",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -16.24,
+          0.377,
+          -7.97
+        ],
+        "rotationDeg": [
+          0,
+          166,
+          0
+        ],
+        "scale": [
+          0.9,
+          0.9,
+          0.9
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-4",
+      "content": {
+        "type": "asset",
+        "asset": "pine-1",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -14.76,
+          0.554,
+          -8.77
+        ],
+        "rotationDeg": [
+          0,
+          249,
+          0
+        ],
+        "scale": [
+          0.94,
+          0.94,
+          0.94
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-5",
+      "content": {
+        "type": "asset",
+        "asset": "pine-2",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -12.55,
+          0.605,
+          -8.44
+        ],
+        "rotationDeg": [
+          0,
+          332,
+          0
+        ],
+        "scale": [
+          0.84,
+          0.84,
+          0.84
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-6",
+      "content": {
+        "type": "asset",
+        "asset": "pine-1",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -10.21,
+          1.28,
+          -12.45
+        ],
+        "rotationDeg": [
+          0,
+          55,
+          0
+        ],
+        "scale": [
+          0.88,
+          0.88,
+          0.88
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-7",
+      "content": {
+        "type": "asset",
+        "asset": "pine-1",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -8.74,
+          1.062,
+          -8.11
+        ],
+        "rotationDeg": [
+          0,
+          138,
+          0
+        ],
+        "scale": [
+          0.92,
+          0.92,
+          0.92
+        ]
+      }
+    },
+    {
+      "id": "journey-pine-8",
+      "content": {
+        "type": "asset",
+        "asset": "pine-2",
+        "castShadow": false,
+        "receiveShadow": false
+      },
+      "transform": {
+        "position": [
+          -6.07,
+          1.721,
+          -11.92
+        ],
+        "rotationDeg": [
+          0,
+          221,
+          0
+        ],
+        "scale": [
+          0.82,
+          0.82,
+          0.82
+        ]
+      }
     },
     {
       "id": "night-sky",
@@ -11472,32 +11615,6 @@
       "name": "Ending smoke (hidden until the finale)",
       "visible": false,
       "framingRole": "support"
-    },
-    {
-      "id": "item-salvage-trigger-2",
-      "name": "Salvage Trigger 2",
-      "content": {
-        "type": "asset",
-        "asset": "trigger"
-      },
-      "transform": {
-        "position": [
-          0.72,
-          0.779,
-          -34.55
-        ],
-        "rotationDeg": [
-          0,
-          55,
-          0
-        ]
-      },
-      "components": {
-        "Item": {
-          "kind": "trigger",
-          "uid": "item-salvage-trigger-2"
-        }
-      }
     }
   ],
   "environment": {

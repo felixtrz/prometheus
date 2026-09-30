@@ -1,7 +1,9 @@
 /**
  * CreatureSystem (priority 16): spawns prey by day and ash-wolves by night and danger
- * stage, runs their steering AI, animates the named rig parts, drops meat and emits
- * the creature cues audio listens for.
+ * stage, runs their steering AI, animates the named rig parts and emits the creature
+ * cues audio listens for. A slain deer or rabbit collapses and is left lying as a
+ * Carcass (same entity and model, Creature removed) for ButcherSystem: its meat comes
+ * only from axe blows. A slain wolf crumbles to ash and leaves a flint shard.
  *
  * Inputs from other systems: CombatSystem lowers Creature.health (and may set
  * Creature.mode = 'scared' for torch contact); GameState carries the clock, stage and
@@ -31,7 +33,7 @@ import {
 import type { Color, Entity, Object3D } from '@iwsdk/core';
 import { bus } from '../bus.js';
 import type { GameEvent } from '../bus.js';
-import { Beacon, Campfire, Creature, CreatureSpawn, GameState, Held, Item } from '../components.js';
+import { Beacon, Campfire, Carcass, Creature, CreatureSpawn, GameState, Held, Item } from '../components.js';
 import {
   angularGap, approach, attackReady, attackSlots, bearingFromAxis, biteLands, clampToBounds, detour, feintPhase, fleePoint,
   headingTo, horizontalDistance, inView, lungeEnd, nightWolvesDue, pressOffset, pressSpot, pushOutside, ringPoint, ringTarget,
@@ -47,28 +49,31 @@ import { DayNightSystem } from './daynight-system.js';
 type Species = 'deer' | 'rabbit' | 'wolf';
 
 interface SpeciesTuning {
-  health: number; meat: number; walk: number; run: number; turn: number; accel: number;
+  health: number; walk: number; run: number; turn: number; accel: number;
   stride: number; strideGain: number; legSwing: number; runSwing: number; bob: number;
   graze: number; lying: number; dyingSeconds: number; hitY: number; hitRadius: number;
   /** Flee at any player speed inside this radius. */
   panicRadius: number;
-  /** Item dropped on a kill (not on dawn dissolve), and how many. */
+  /**
+   * Item dropped on a kill (not on dawn dissolve), and how many. Prey drop nothing:
+   * they leave a carcass to butcher (BUTCHER in butcher-system.ts).
+   */
   drop: string; drops: number;
 }
 
 const SPECIES: Record<Species, SpeciesTuning> = {
   deer: {
-    health: 1, meat: 2, walk: .85, run: 6.2, turn: 3.2, accel: 6, stride: 1.05, strideGain: .2, legSwing: .42,
+    health: 1, walk: .85, run: 6.2, turn: 3.2, accel: 6, stride: 1.05, strideGain: .2, legSwing: .42,
     runSwing: .85, bob: .022, graze: 2.0, lying: .2, dyingSeconds: 1.4, hitY: .85, hitRadius: .45,
-    panicRadius: 1.7, drop: 'meat', drops: 2,
+    panicRadius: 1.7, drop: '', drops: 0,
   },
   rabbit: {
-    health: 1, meat: 1, walk: .55, run: 4.6, turn: 8, accel: 14, stride: .3, strideGain: .14, legSwing: .5,
+    health: 1, walk: .55, run: 4.6, turn: 8, accel: 14, stride: .3, strideGain: .14, legSwing: .5,
     runSwing: .9, bob: .05, graze: .45, lying: .075, dyingSeconds: 1.1, hitY: .14, hitRadius: .18,
-    panicRadius: 2.5, drop: 'meat', drops: 1,
+    panicRadius: 2.5, drop: '', drops: 0,
   },
   wolf: {
-    health: DANGER.wolfHealth, meat: 0, walk: 1.5, run: 6, turn: 4.2, accel: 8, stride: .8, strideGain: .16,
+    health: DANGER.wolfHealth, walk: 1.5, run: 6, turn: 4.2, accel: 8, stride: .8, strideGain: .16,
     legSwing: .45, runSwing: .8, bob: .02, graze: 0, lying: .2, dyingSeconds: 1.2, hitY: .56, hitRadius: .4,
     panicRadius: 0, drop: 'flint', drops: 1,
   },
@@ -210,6 +215,8 @@ interface CreatureRig {
   rollSide: number;
   /** Latched once dying starts, so later writes to Creature.mode cannot revive it. */
   dying: boolean;
+  /** Slain prey: once the collapse ends it stays as a Carcass instead of being removed. */
+  carcass: boolean;
   shadow: Object3D | null;
   /** Seconds since spawn (drives the prey scale-in). */
   age: number;
@@ -363,8 +370,10 @@ export class CreatureSystem extends createSystem({
       }),
       bus.on('death', () => {
         this.scatterWolves();
-        // The Spire's guardians never follow a respawn home: they dissolve where they stand.
+        // The Spire's guardians never follow a respawn home: they dissolve where they stand
+        // (see tick), and any still loading never rise, so none count toward a retry's waves.
         this.guardianEpoch++;
+        this.pendingGuardians = 0;
       }),
       bus.on('respawn', () => {
         this.scatterWolves();
@@ -477,12 +486,12 @@ export class CreatureSystem extends createSystem({
     }
   }
 
-  /** Guardians alive or on their way (spawns still loading count too). */
+  /** This epoch's guardians alive or on their way (spawns still loading count too; a death's leftovers do not). */
   private liveGuardians(): number {
     let count = this.pendingGuardians;
     for (const entity of this.queries.creatures.entities) {
       const rig = entity.object3D ? this.rigs.get(entity.object3D) : undefined;
-      if (rig?.guardian && !rig.dying) count++;
+      if (rig?.guardian && !rig.dying && rig.epoch === this.guardianEpoch) count++;
     }
     return count;
   }
@@ -794,7 +803,8 @@ export class CreatureSystem extends createSystem({
       console.warn(`[Prometheus] ${species} spawn failed`, error);
     } finally {
       if (wolf) this.pendingWolves--; else this.pendingPrey--;
-      if (guardian) this.pendingGuardians--;
+      // A death zeroed the count for older epochs (see init).
+      if (guardian && epoch === this.guardianEpoch) this.pendingGuardians--;
       // After a reset or level swap the ledger was cleared: never re-add a stale anchor.
       if (anchor && generation === this.generation) {
         const left = (this.pendingAt.get(anchor) ?? 1) - 1;
@@ -824,7 +834,7 @@ export class CreatureSystem extends createSystem({
       howlIn: random(W.firstHowlSeconds), howling: 0, growlIn: 0, lastMode: '', lastHealth: SPECIES[species].health,
       threatX: 0, threatZ: 0, goalX: object.position.x, goalZ: object.position.z, fromX: 0, fromZ: 0, toX: 0, toZ: 0,
       headPitch: 0, headYaw: 0, bodyPitch: 0, crouch: 0, tailLift: 0, rollSide: Math.random() < .5 ? -1 : 1,
-      dying: false, shadow: object.getObjectByName('shadow') ?? null, age: 0, stalkCueIn: Math.random() * W.stalkCueSeconds,
+      dying: false, carcass: false, shadow: object.getObjectByName('shadow') ?? null, age: 0, stalkCueIn: Math.random() * W.stalkCueSeconds,
       feintAt: 0, snapped: false, pressOffset: 0, epoch: this.guardianEpoch, shadowSlot: Math.floor(Math.random() * 3),
     };
   }
@@ -862,6 +872,16 @@ export class CreatureSystem extends createSystem({
     if (this.nextAttacker2 === object) this.nextAttacker2 = null;
     for (let i = 0; i < 2; i++) if (this.pincerWolves[i] === object) this.pincerWolves[i] = null;
     this.releaseRig(object);
+  }
+
+  /**
+   * The collapse is over: the fallen prey stops being a creature (no query that counts,
+   * targets or spawns creatures sees it again) and lies as a Carcass for ButcherSystem.
+   */
+  private leaveCarcass(entity: Entity, object: Object3D, species: Species): void {
+    this.forget(object);
+    entity.removeComponent(Creature);
+    entity.addComponent(Carcass, { species, ground: object.position.y });
   }
 
   private remove(entity: Entity, object: Object3D): void {
@@ -969,7 +989,8 @@ export class CreatureSystem extends createSystem({
 
     if (mode === 'dying') {
       if (timer <= 0) {
-        this.remove(entity, object);
+        if (rig.carcass) this.leaveCarcass(entity, object, rig.species);
+        else this.remove(entity, object);
         return;
       }
     } else if (rig.wolf) {
@@ -1032,7 +1053,8 @@ export class CreatureSystem extends createSystem({
     let progress = 0, sink = 0;
     if (mode === 'dying') {
       progress = clamp01(1 - timer / spec.dyingSeconds);
-      sink = rig.wolf ? .18 * progress : .5 * clamp01((progress - .55) / .45);
+      // Wolves slump into their ash; prey collapse onto their side and stay lying (a carcass).
+      sink = rig.wolf ? .18 * progress : 0;
     } else if (mode === 'emerge') {
       progress = clamp01(1 - timer / W.emergeSeconds);
       sink = W.emergeDepth * (1 - progress * progress * (3 - 2 * progress));
@@ -1041,7 +1063,7 @@ export class CreatureSystem extends createSystem({
     object.position.set(p.x, ground - sink, p.z);
     object.quaternion.setFromAxisAngle(UP, heading);
     this.animate(rig, object, spec, mode, speed, progress, dt);
-    this.groundShadow(rig, mode, progress, sink, p.x, p.z, heading, speed < .05 && !intent.direct);
+    this.groundShadow(rig, mode, progress, sink, p.x, p.z, heading, speed < .05 && !intent.direct, rig.wolf);
 
     if (mode !== storedMode) entity.setValue(Creature, 'mode', mode);
     entity.setValue(Creature, 'timer', timer);
@@ -1110,6 +1132,7 @@ export class CreatureSystem extends createSystem({
    */
   private groundShadow(
     rig: CreatureRig, mode: string, progress: number, sink: number, x: number, z: number, heading: number, standing: boolean,
+    fades: boolean,
   ): void {
     const shadow = rig.shadow;
     if (!shadow) return;
@@ -1120,7 +1143,8 @@ export class CreatureSystem extends createSystem({
       shadow.rotation.set(-Math.atan(slopeForward), 0, Math.atan(slopeSide));
     }
     shadow.position.y = sink;
-    const size = mode === 'dying' ? 1 - progress : mode === 'emerge' ? progress : 1;
+    // A dissolving wolf's shadow shrinks with it; a fallen deer keeps its shadow under the carcass.
+    const size = mode === 'dying' && fades ? 1 - progress : mode === 'emerge' ? progress : 1;
     shadow.scale.setScalar(Math.max(.01, size));
   }
 
@@ -1242,8 +1266,12 @@ export class CreatureSystem extends createSystem({
   private onDeath(rig: CreatureRig, object: Object3D): void {
     const { x, y, z } = object.position;
     if (rig.wolf) this.cue('wolf', 'dissolve', x, y, z);
-    else if (rig.anchor) this.anchorCooldown.set(rig.anchor, this.time + P.respawnCooldown);
-    // Deer and rabbits drop meat; a slain wolf leaves an ash-flint shard.
+    else {
+      // Prey fall and stay down as a carcass: the meat is butchered from it with the axe.
+      rig.carcass = true;
+      if (rig.anchor) this.anchorCooldown.set(rig.anchor, this.time + P.respawnCooldown);
+    }
+    // A slain wolf leaves an ash-flint shard.
     const { drop, drops } = SPECIES[rig.species];
     for (let i = 0; i < drops; i++) {
       const side = drops > 1 ? (i - (drops - 1) / 2) * .3 : 0;

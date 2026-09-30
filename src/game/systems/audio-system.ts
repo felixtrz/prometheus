@@ -32,6 +32,11 @@
  *   (sleep, death until respawn, the journey fade-in).
  * - Stingers: dusk, dawn (deduped, and held until a sleep swell finishes), stage (only
  *   when it rises during play), sleep, death, journey, spire-eye, ending theme.
+ * - Pot simmer: a quiet procedural bubbling loop at the pot while it holds ingredients
+ *   or a finished stew over the lit fire (Campfire.potA / stew / lit).
+ * - Room send: every positional one-shot also feeds one shared ConvolverNode (procedural
+ *   impulse response, no download) with wet = reverbWet(distance), so far sounds are wetter.
+ * - Starving: most ticks are a soft breath, a grunt only on every STARVE.every-th (starveScale).
  * - Voice duck: while Prometheus' shade speaks aloud (a 'guide' event with `voiced`, for its
  *   `seconds`, released early by 'guide-end'), the beds, world loops, ambience spots and
  *   music stingers dip to VOICE_DUCK.level. Subtitle-only lines (no clip) never duck.
@@ -42,7 +47,7 @@
  *   (IWSDK only resumes it on XR sessionstart). One-shots requested while suspended are
  *   skipped (else they would all fire on resume) but logged with played:false. A master
  *   compressor on the listener catches pile-ups (finale: roar + ignite + theme).
- * - Verification: globalThis.__prometheusAudioLog (last 64 {clip, t, played}; footsteps
+ * - Verification (dev builds only): globalThis.__prometheusAudioLog (last 64 {clip, t, played}; footsteps
  *   and repeat heartbeats are counted in the state instead) and
  *   globalThis.__prometheusAudioState (live loop, heartbeat and footstep state).
  *
@@ -51,21 +56,22 @@
  */
 import {
   AssetManager, AudioContext as ThreeAudioContext, AudioSource, AudioUtils, createSystem, DistanceModel, PlaybackMode, Vector3,
-  type AudioListener, type Entity,
+  type AudioListener, type Entity, type PositionalAudio,
 } from '@iwsdk/core';
 import type { ClipId } from '../audio-assets.js';
 import {
-  CLIP_DEFS, DUCK, HEARTBEAT, STEP, beaconBuildVolume, createCue, dayBedGain, fireLoopVolume, heartbeatVolume, mapEvent,
-  nearestOnPolyline, nightBedGain, stepCue, strideFor, variantId, type AudioCue, type ClipDef, type OneShotId,
+  CLIP_DEFS, DUCK, HEARTBEAT, STARVE, STEP, beaconBuildVolume, createCue, dayBedGain, fireLoopVolume, heartbeatVolume, mapEvent,
+  nearestOnPolyline, nightBedGain, reverbWet, starveScale, stepCue, strideFor, variantId, type AudioCue, type ClipDef, type OneShotId,
 } from '../audio-map.js';
 import { bus, type GameEvent } from '../bus.js';
 import { ITEMS } from '../catalog.js';
 import { Beacon, Campfire, GameState, Held, Item } from '../components.js';
 import { pulse } from '../haptics.js';
-import { nightness } from '../rules.js';
+import { CAMP, nightness } from '../rules.js';
 import { LANDMARKS, terrainHeight } from '../terrain.js';
 import { trailHit, trailNearest } from '../../scene-assets/valley-layout.scene-asset.js';
 import { DayNightSystem } from './daynight-system.js';
+import { GuideSystem } from './guide-system.js';
 
 /** Bed levels at full day / full night (≈ −27 LUFS in game). */
 const BED = { day: 0.8, night: 0.85 } as const;
@@ -83,13 +89,20 @@ const BROOK = { on: 32, off: 38, lift: 0.3, volume: 0.75 } as const;
 /** Beacon roar under the ending theme: dip to `level` over `attack` s, hold, recover over `release` s. */
 const ROAR_DUCK = { level: 0.4, attack: 1.5, hold: 20, release: 6 } as const;
 /** Under the shade's voice: gain, attack/release rates (1/s) and a tail after the line (s). */
-const VOICE_DUCK = { level: 0.5, attack: 4, release: 1.2, tail: 0.5 } as const;
+const VOICE_DUCK = { level: 0.5, attack: 10, release: 1.2, tail: 0.5 } as const;
 /** Stingers and themes that dip under the shade's voice (and fade out on a journey reset). */
 const MUSIC: readonly OneShotId[] = ['journey', 'dusk', 'dawn', 'stage', 'sleep', 'ending', 'spire-eye', 'death'];
 /** Fade (s) for the music, stingers and world loops when a journey resets. */
 const RESET_FADE = 0.4;
 /** Shared positional one-shot voices, and the clip they load before their first swap. */
 const SPATIAL = { voices: 16, placeholder: 'snap' } as const;
+/** Procedural room impulse response: length (s), pre-delay (s), decay (1/s), and the damping filter's start/end coefficients. */
+const ROOM = { seconds: 2.4, predelay: 0.025, decay: 2.6, bright: 0.85, dark: 0.08 } as const;
+/**
+ * The pot's simmer loop (procedural): level (≈ −32 LUFS at arm's length), distance settings,
+ * loop length (s), bubbles per second, and the loaded clip its emitter holds until the swap.
+ */
+const SIMMER = { volume: 0.3, refDistance: 0.6, rolloff: 1.3, maxDistance: 20, seconds: 5, bubbles: 11, placeholder: 'fire-pops' } as const;
 /**
  * Footstep bookkeeping: travel already counted when walking starts (the first step lands
  * after stride − first m), per-frame rig motion (m) below which the rig is standing
@@ -134,13 +147,65 @@ type AudioDebugState = {
   context: string; day: number; night: number; duck: number; voiceDuck: number;
   fire: number; torch: boolean; brook: boolean; brookDistance: number; build: number; roar: number;
   heartbeat: boolean; beats: number; heartPhase: number; begun: boolean;
-  steps: number; stepsPlayed: number; stepClip: string; stepRate: number; spatialBusy: number; voices: number;
+  steps: number; stepsPlayed: number; stepClip: string; stepRate: number; spatialBusy: number; voices: number; simmer: boolean;
 };
 declare global {
   // eslint-disable-next-line no-var
   var __prometheusAudioLog: AudioLogEntry[] | undefined;
   // eslint-disable-next-line no-var
   var __prometheusAudioState: AudioDebugState | undefined;
+}
+
+/** IWSDK's per-entity AudioPool (AudioSource `_pool`); a spatial voice's pool holds one PositionalAudio. */
+type VoicePool = { getAllInstances(): PositionalAudio[] };
+
+/** A stereo room impulse response: decaying noise that darkens as it fades. */
+function roomImpulse(ctx: BaseAudioContext): AudioBuffer {
+  const rate = ctx.sampleRate, length = Math.round(rate * ROOM.seconds), start = Math.round(rate * ROOM.predelay);
+  const buffer = ctx.createBuffer(2, length, rate);
+  for (let c = 0; c < 2; c++) {
+    const data = buffer.getChannelData(c);
+    let y = 0;
+    for (let i = start; i < length; i++) {
+      const t = (i - start) / rate;
+      const k = ROOM.dark + (ROOM.bright - ROOM.dark) * Math.exp(-t * 3);
+      y += k * (Math.random() * 2 - 1 - y);
+      data[i] = y * Math.exp(-ROOM.decay * t);
+    }
+  }
+  return buffer;
+}
+
+/** A seamless simmer loop: a low rumble under small rising bubble blips (mono, peak 0.9). */
+function simmerLoop(ctx: BaseAudioContext): AudioBuffer {
+  const rate = ctx.sampleRate, length = Math.round(rate * SIMMER.seconds), fade = Math.round(rate * 0.25);
+  const buffer = ctx.createBuffer(1, length, rate);
+  const out = buffer.getChannelData(0);
+  // Rumble: low-passed noise, generated `fade` samples long and crossfaded over the seam.
+  const noise = new Float32Array(length + fade);
+  let lp = 0;
+  for (let i = 0; i < noise.length; i++) {
+    lp += 0.015 * (Math.random() * 2 - 1 - lp);
+    noise[i] = lp * 0.9;
+  }
+  for (let i = 0; i < length; i++) out[i] = i < fade ? noise[i] * (i / fade) + noise[length + i] * (1 - i / fade) : noise[i];
+  // Bubbles: short rising sine blips, wrapped around the loop so the seam stays clean.
+  const count = Math.round(SIMMER.bubbles * SIMMER.seconds);
+  for (let b = 0; b < count; b++) {
+    const at = Math.floor(Math.random() * length);
+    const n = Math.round(rate * (0.012 + Math.random() * 0.035));
+    const f0 = 220 + Math.random() * 480, amp = 0.08 + 0.4 * Math.random() * Math.random();
+    let phase = 0;
+    for (let j = 0; j < n; j++) {
+      const u = j / n;
+      phase += (2 * Math.PI * f0 * (1 + 0.9 * u)) / rate;
+      out[(at + j) % length] += amp * Math.sin(Math.PI * u) * Math.exp(-4 * u) * Math.sin(phase);
+    }
+  }
+  let peak = 1e-6;
+  for (let i = 0; i < length; i++) peak = Math.max(peak, Math.abs(out[i]));
+  for (let i = 0; i < length; i++) out[i] *= 0.9 / peak;
+  return buffer;
 }
 
 type Mode = (typeof PlaybackMode)[keyof typeof PlaybackMode];
@@ -175,6 +240,16 @@ export class GameAudioSystem extends createSystem({
   private spatialClip!: Int16Array;
   private spatialStart!: Float64Array;
   private spatialUntil!: Float64Array;
+  /** Per spatial voice: its send into the shared room reverb, and whether its PositionalAudio is wired to it yet. */
+  private readonly sends: GainNode[] = [];
+  private sendWired!: Uint8Array;
+  private simmer!: Entity;
+  private simmerBuffer!: AudioBuffer;
+  private simmerReady = false;
+  private simmerOn = false;
+  /** Starving hurts in the current run, and when the last one came (s). */
+  private starveTicks = 0;
+  private starveAt = -1e9;
   private lastTake!: Int8Array;
   private lastPlayed!: Float64Array;
   private day!: Entity;
@@ -206,6 +281,7 @@ export class GameAudioSystem extends createSystem({
   private duckUntil = 0;
   private roarDuckAt = -1e9;
   private voiceUntil = 0;
+  private guide?: GuideSystem;
   private voiceDuck = 1;
   private musicApplied = 1;
   private readonly musicVoices: Entity[] = [];
@@ -236,11 +312,12 @@ export class GameAudioSystem extends createSystem({
   private readonly log: AudioLogEntry[] = [];
   private readonly debug: AudioDebugState = {
     context: 'suspended', day: 0, night: 0, duck: 1, voiceDuck: 1, fire: 0, torch: false, brook: false, brookDistance: 0, build: 0, roar: 0,
-    heartbeat: false, beats: 0, heartPhase: -1, begun: false, steps: 0, stepsPlayed: 0, stepClip: '', stepRate: 0, spatialBusy: 0, voices: 0,
+    heartbeat: false, beats: 0, heartPhase: -1, begun: false, steps: 0, stepsPlayed: 0, stepClip: '', stepRate: 0, spatialBusy: 0, voices: 0, simmer: false,
   };
 
   init(): void {
     this.dayNight = this.world.getSystem(DayNightSystem);
+    this.guide = this.world.getSystem(GuideSystem);
     this.ctx = ThreeAudioContext.getContext();
 
     // One-shots: head-locked clips get their own emitter; positional ones share the pool.
@@ -264,6 +341,7 @@ export class GameAudioSystem extends createSystem({
     this.spatialClip = new Int16Array(SPATIAL.voices).fill(-1);
     this.spatialStart = new Float64Array(SPATIAL.voices);
     this.spatialUntil = new Float64Array(SPATIAL.voices);
+    this.sendWired = new Uint8Array(SPATIAL.voices);
 
     for (const id of MUSIC) {
       const i = this.clipIndex.get(id);
@@ -286,9 +364,15 @@ export class GameAudioSystem extends createSystem({
     this.build = this.emitter('beacon-build', { positional: true, loop: true, volume: 0, refDistance: 4, rolloffFactor: 0.8, maxDistance: 150 });
     for (const fire of [this.fireBed, this.firePops]) fire.object3D!.position.set(LANDMARKS.campfire.x, 0.5, LANDMARKS.campfire.z);
     for (const spire of [this.roar, this.build]) spire.object3D!.position.set(LANDMARKS.beacon.x, LANDMARKS.beacon.y + 1, LANDMARKS.beacon.z);
+    // The pot's simmer: its emitter loads a placeholder clip, then swaps in the procedural loop.
+    this.simmer = this.emitter(SIMMER.placeholder, {
+      positional: true, loop: true, volume: 0, refDistance: SIMMER.refDistance, rolloffFactor: SIMMER.rolloff, maxDistance: SIMMER.maxDistance,
+    }, 'pot-simmer');
+    this.simmer.object3D!.position.set(CAMP.pot.x, CAMP.pot.y + 0.05, CAMP.pot.z);
+    this.simmerBuffer = simmerLoop(this.ctx);
     AudioUtils.play(this.day);
     AudioUtils.play(this.night);
-    this.debug.voices = voiceCount + 8;
+    this.debug.voices = voiceCount + 9;
 
     this.cleanupFuncs.push(
       bus.onAny(this.onEvent),
@@ -303,6 +387,22 @@ export class GameAudioSystem extends createSystem({
 
     // Master bus limiter: protects the output when loud cues pile up.
     const listener = this.player.head.children.find((o) => o.type === 'AudioListener') as AudioListener | undefined;
+    // Shared room reverb: one convolver fed by a send per spatial voice, returned into the listener (before the limiter).
+    if (listener) {
+      const room = this.ctx.createConvolver();
+      room.buffer = roomImpulse(this.ctx);
+      room.connect(listener.getInput());
+      for (let k = 0; k < SPATIAL.voices; k++) {
+        const send = this.ctx.createGain();
+        send.gain.value = 0;
+        send.connect(room);
+        this.sends.push(send);
+      }
+      this.cleanupFuncs.push(() => {
+        for (const send of this.sends) send.disconnect();
+        room.disconnect();
+      });
+    }
     if (listener && !listener.getFilter()) {
       const limiter = this.ctx.createDynamicsCompressor();
       limiter.threshold.value = -6;
@@ -334,8 +434,11 @@ export class GameAudioSystem extends createSystem({
     xr.addEventListener('sessionend', onSessionEnd);
     if (xr.isPresenting) onSessionStart();
 
-    globalThis.__prometheusAudioLog = this.log;
-    globalThis.__prometheusAudioState = this.debug;
+    // Verification globals: dev server only (the vitexec scenarios run there), never in a production build.
+    if (import.meta.env.DEV) {
+      globalThis.__prometheusAudioLog = this.log;
+      globalThis.__prometheusAudioState = this.debug;
+    }
     this.cleanupFuncs.push(() => {
       window.removeEventListener('pointerdown', this.resume);
       window.removeEventListener('touchstart', this.resume);
@@ -355,6 +458,8 @@ export class GameAudioSystem extends createSystem({
     const night = Math.max(nightness(state ? (state.getValue(GameState, 'clock') ?? 0) : 0), this.dayNight?.finaleDark ?? 0);
     const target = time < this.duckUntil ? this.duckTarget : 1;
     this.duck += (target - this.duck) * Math.min(1, delta * 1.5);
+    // Duck while the shade is still arriving with its clip ready, so the beds are down by the first word.
+    if (this.guide?.voiceComing) this.voiceUntil = Math.max(this.voiceUntil, time + VOICE_DUCK.tail);
     const voiceTarget = time < this.voiceUntil ? VOICE_DUCK.level : 1;
     this.voiceDuck += (voiceTarget - this.voiceDuck) * Math.min(1, delta * (voiceTarget < this.voiceDuck ? VOICE_DUCK.attack : VOICE_DUCK.release));
     this.setVolume(this.day, BED.day * dayBedGain(night) * this.duck * this.voiceDuck);
@@ -456,8 +561,31 @@ export class GameAudioSystem extends createSystem({
         break;
     }
     const cue = mapEvent(event, this.cue);
-    if (cue) this.playCue(cue);
+    if (!cue) return;
+    if (event.type === 'page') this.atPageHand(cue);
+    else if (event.type === 'hurt' && event.cause === 'starving') {
+      // A soft breath most ticks; the grunt on the first of a run and every STARVE.every-th.
+      if (this.now - this.starveAt > STARVE.reset) this.starveTicks = 0;
+      this.starveAt = this.now;
+      cue.volume = Math.min(1, CLIP_DEFS['player-hurt'].volume * starveScale(this.starveTicks++, event.amount));
+    }
+    this.playCue(cue);
   };
+
+  /** Place a page cue at the hand holding the page (else the right hand). */
+  private atPageHand(cue: AudioCue): void {
+    let hand = this.player.gripSpaces.right as { getWorldPosition(v: Vector3): Vector3 } | undefined;
+    for (const entity of this.queries.held.entities) {
+      if (entity.getValue(Item, 'kind') !== 'page' || !entity.object3D) continue;
+      hand = entity.object3D;
+      break;
+    }
+    if (hand) hand.getWorldPosition(this.scratch);
+    else this.player.head.getWorldPosition(this.scratch);
+    cue.x = this.scratch.x;
+    cue.y = this.scratch.y;
+    cue.z = this.scratch.z;
+  }
 
   /**
    * A journey reset: fade the music and stingers (the ending theme, a death or dusk
@@ -475,6 +603,10 @@ export class GameAudioSystem extends createSystem({
     if (this.torchOn) AudioUtils.pause(this.torch, RESET_FADE);
     if (this.roarOn) AudioUtils.pause(this.roar, RESET_FADE);
     if (this.buildOn) AudioUtils.pause(this.build, RESET_FADE);
+    if (this.simmerOn) AudioUtils.pause(this.simmer, RESET_FADE);
+    this.simmerOn = false;
+    this.starveTicks = 0;
+    this.starveAt = -1e9;
     this.fireLit = this.torchOn = this.roarOn = this.buildOn = false;
     this.heartOn = false;
     this.heartBeats = 0;
@@ -571,11 +703,30 @@ export class GameAudioSystem extends createSystem({
     voice.setValue(AudioSource, 'rolloffFactor', def.rolloff);
     voice.setValue(AudioSource, 'maxDistance', def.maxDistance);
     voice.setValue(AudioSource, 'volume', volume);
+    this.sendToRoom(s, voice, x, y, z);
     AudioUtils.play(voice);
     this.spatialClip[s] = i;
     this.spatialStart[s] = this.now;
     this.spatialUntil[s] = this.now + buffer.duration + 0.05;
     return true;
+  }
+
+  /**
+   * Set spatial voice `s`'s room send for a cue at (x, y, z): wetter with distance from the
+   * listener (`this.head`, set by playCue). The voice's PositionalAudio (IWSDK creates its
+   * pool a frame after the clip loads) is wired to the send the first time it exists.
+   */
+  private sendToRoom(s: number, voice: Entity, x: number, y: number, z: number): void {
+    const send = this.sends[s];
+    if (!send) return;
+    if (!this.sendWired[s]) {
+      const audio = (voice.getValue(AudioSource, '_pool') as VoicePool | undefined)?.getAllInstances()[0];
+      if (!audio) return;
+      audio.gain.connect(send);
+      this.sendWired[s] = 1;
+    }
+    const h = this.head;
+    send.gain.setValueAtTime(reverbWet(Math.hypot(x - h.x, y - h.y, z - h.z)), this.ctx.currentTime);
   }
 
   /** Music already playing follows the voice duck (applied only when it moves). */
@@ -746,6 +897,27 @@ export class GameAudioSystem extends createSystem({
       AudioUtils.pause(this.firePops, 1.0);
       this.fireOn = false;
     }
+    this.updateSimmer(lit, fire);
+  }
+
+  /** The pot simmers while it holds ingredients or a finished stew over the lit fire. */
+  private updateSimmer(lit: boolean, fire: Entity | undefined): void {
+    if (!this.simmerReady) {
+      if (!this.simmer.getValue(AudioSource, '_loaded')) return;
+      this.simmer.setValue(AudioSource, '_buffer', this.simmerBuffer);
+      this.simmerReady = true;
+    }
+    const filled = !!fire && !!(fire.getValue(Campfire, 'potA') || fire.getValue(Campfire, 'stew'));
+    const want = lit && filled;
+    if (want) this.setVolume(this.simmer, SIMMER.volume * this.voiceDuck);
+    if (want && !this.simmerOn) {
+      AudioUtils.play(this.simmer, 2);
+      this.simmerOn = true;
+    } else if (!want && this.simmerOn) {
+      AudioUtils.pause(this.simmer, 1.5);
+      this.simmerOn = false;
+    }
+    this.debug.simmer = this.simmerOn;
   }
 
   /** Every frame: the flame loop follows the tip of a held, lit torch. */
